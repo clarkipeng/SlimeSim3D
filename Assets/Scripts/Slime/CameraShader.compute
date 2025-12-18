@@ -1,0 +1,143 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+Texture3D<float4> InputTexture;
+
+float4x4 _CameraToWorld;
+float4x4 _CameraInverseProjection;
+float _Opacity;
+
+RWTexture2D<float4> Result;
+
+
+struct Ray
+{
+    float3 origin;
+    float3 direction;
+};
+
+bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax){
+    float3 invDir = 1.0 / rd;
+
+    float3 t0 = (-0.5 - ro) * invDir;
+    float3 t1 = (0.5 - ro) * invDir;
+
+    float3 tmin3 = min(t0, t1);
+    float3 tmax3 = max(t0, t1);
+
+    tmin = max(max(tmin3.x, tmin3.y), tmin3.z);
+    tmax  = min(min(tmax3.x, tmax3.y), tmax3.z);
+
+    return tmax >= max(tmin, 0.0);
+}
+
+float3 Trace(Ray ray)
+{
+    float tin, tout;
+    if (!IntersectBox(ray.origin, ray.direction, tin, tout))
+    {
+        return float3(0,0,0); // Background color
+    }
+
+    float t = max(tin, 0.0) + 1e-8;
+    float3 pos = ray.origin + ray.direction * t;
+
+    uint3 volumeDim;
+    InputTexture.GetDimensions(volumeDim.x, volumeDim.y, volumeDim.z);
+    
+    float3 uvw = pos + 0.5;
+    float3 voxelPos = uvw * volumeDim;
+    int3 voxel = int3(floor(voxelPos));
+
+    int3 step = sign(ray.direction);
+    float3 tDelta = abs(1.0 / (ray.direction * volumeDim));
+
+    float3 distToNextBoundary;
+    distToNextBoundary.x = (step.x > 0) ? floor(voxelPos.x + 1.0) - voxelPos.x : voxelPos.x - floor(voxelPos.x);    
+    distToNextBoundary.y = (step.y > 0) ? floor(voxelPos.y + 1.0) - voxelPos.y : voxelPos.y - floor(voxelPos.y);
+    distToNextBoundary.z = (step.z > 0) ? floor(voxelPos.z + 1.0) - voxelPos.z : voxelPos.z - floor(voxelPos.z);
+
+    float3 tMax = t + (distToNextBoundary * tDelta);
+    float4 dst = float4(0, 0, 0, 0);
+
+    [loop]
+    while (t < tout)
+    {
+        if (all(voxel >= 0) && all(voxel < int3(volumeDim)))
+        {
+            float4 src = InputTexture[voxel];
+            float alpha = (3.0 - (src.r + src.g + src.b)) / 3.0; 
+            alpha = saturate(alpha * _Opacity);
+            dst.rgb += src.rgb * alpha * (1.0 - dst.a);
+            dst.a += alpha * (1.0 - dst.a);
+
+            if (dst.a >= 0.99) break; // Early exit if opaque
+        }
+        if (tMax.x < tMax.y)
+        {
+            if (tMax.x < tMax.z)
+            {
+                voxel.x += step.x;
+                t = tMax.x;
+                tMax.x += tDelta.x;
+            }
+            else
+            {
+                voxel.z += step.z;
+                t = tMax.z;
+                tMax.z += tDelta.z;
+            }
+        }
+        else
+        {
+            if (tMax.y < tMax.z)
+            {
+                voxel.y += step.y;
+                t = tMax.y;
+                tMax.y += tDelta.y;
+            }
+            else
+            {
+                voxel.z += step.z;
+                t = tMax.z;
+                tMax.z += tDelta.z;
+            }
+        }
+    }
+
+    return dst.rgb;
+}
+
+Ray CreateRay(float3 origin, float3 direction)
+{
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    return ray;
+}
+Ray CreateCameraRay(float2 uv)
+{
+    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
+    direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz;
+    direction = normalize(direction);
+
+    return CreateRay(origin, direction);
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // Get the dimensions of the RenderTexture
+    uint width, height;
+    Result.GetDimensions(width, height);
+
+    // Transform pixel to [-1,1] range
+    float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
+
+    // Get a ray for the UVs
+    Ray ray = CreateCameraRay(uv);
+
+    float3 result = Trace(ray);
+    Result[id.xy] = float4(result, 1);
+}
