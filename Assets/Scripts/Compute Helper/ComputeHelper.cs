@@ -5,12 +5,16 @@
 	using System.Reflection;
 	using UnityEngine;
 	using UnityEngine.Experimental.Rendering;
+	using UnityEngine.Rendering;
 
 	public static class ComputeHelper
 	{
 
 		public const FilterMode defaultFilterMode = FilterMode.Bilinear;
 		public const GraphicsFormat defaultGraphicsFormat = GraphicsFormat.R16G16B16A16_SFloat; //GraphicsFormat.R8G8B8A8_UNorm;
+
+		public const TextureWrapMode defaultWrapMode = TextureWrapMode.Clamp;
+		public const TextureFormat defaultTextureFormat = TextureFormat.RGBAFloat;
 
 		static ComputeShader normalizeTextureCompute;
 		static ComputeShader clearTextureCompute;
@@ -29,7 +33,7 @@
 			Vector3Int threadGroupSizes = GetThreadGroupSizes(cs, kernelIndex);
 			int numGroupsX = Mathf.CeilToInt(numIterationsX / (float)threadGroupSizes.x);
 			int numGroupsY = Mathf.CeilToInt(numIterationsY / (float)threadGroupSizes.y);
-			int numGroupsZ = Mathf.CeilToInt(numIterationsZ / (float)threadGroupSizes.y);
+			int numGroupsZ = Mathf.CeilToInt(numIterationsZ / (float)threadGroupSizes.z);
 			cs.Dispatch(kernelIndex, numGroupsX, numGroupsY, numGroupsZ);
 		}
 
@@ -105,13 +109,19 @@
 
 		public static void CreateRenderTexture(ref RenderTexture texture, int width, int height)
 		{
-			CreateRenderTexture(ref texture, width, height, defaultFilterMode, defaultGraphicsFormat);
+			CreateRenderTexture(ref texture, width, height, 0, defaultFilterMode, defaultGraphicsFormat);
 		}
-
-
 		public static void CreateRenderTexture(ref RenderTexture texture, int width, int height, FilterMode filterMode, GraphicsFormat format)
 		{
-			if (texture == null || !texture.IsCreated() || texture.width != width || texture.height != height || texture.graphicsFormat != format)
+			CreateRenderTexture(ref texture, width, height, 0, filterMode, format);
+		}
+		public static void CreateRenderTexture(ref RenderTexture texture, int width, int height, int depth)
+		{
+			CreateRenderTexture(ref texture, width, height, depth, defaultFilterMode, defaultGraphicsFormat);
+		}
+		public static void CreateRenderTexture(ref RenderTexture texture, int width, int height, int depth, FilterMode filterMode, GraphicsFormat format)
+		{
+			if (texture == null || !texture.IsCreated() || texture.width != width || texture.height != height || texture.volumeDepth != depth || texture.graphicsFormat != format)
 			{
 				if (texture != null)
 				{
@@ -120,8 +130,18 @@
 				texture = new RenderTexture(width, height, 0);
 				texture.graphicsFormat = format;
 				texture.enableRandomWrite = true;
-
 				texture.autoGenerateMips = false;
+
+				if (depth > 1)
+				{
+					texture.dimension = TextureDimension.Tex3D;
+					texture.volumeDepth = depth;
+				}
+				else
+				{
+					texture.dimension = TextureDimension.Tex2D;
+					texture.volumeDepth = 1;
+				}
 				texture.Create();
 			}
 			texture.wrapMode = TextureWrapMode.Clamp;
@@ -131,28 +151,15 @@
 		/// Copy the contents of one render texture into another. Assumes textures are the same size.
 		public static void CopyRenderTexture(Texture source, RenderTexture target)
 		{
-			Graphics.Blit(source, target);
-		}
-
-		/// Swap channels of texture, or set to zero. For example, if inputs are: (green, red, zero, zero)
-		/// then red and green channels will be swapped, and blue and alpha channels will be set to zero.
-		public static void SwizzleTexture(Texture texture, Channel x, Channel y, Channel z, Channel w)
-		{
-			if (swizzleTextureCompute == null)
+			if (target.dimension == TextureDimension.Tex3D)
 			{
-				swizzleTextureCompute = (ComputeShader)Resources.Load("Swizzle");
+				Graphics.CopyTexture(source, target);
 			}
-
-			swizzleTextureCompute.SetInt("width", texture.width);
-			swizzleTextureCompute.SetInt("height", texture.height);
-			swizzleTextureCompute.SetTexture(0, "Source", texture);
-			swizzleTextureCompute.SetVector("x", ChannelToMask(x));
-			swizzleTextureCompute.SetVector("y", ChannelToMask(y));
-			swizzleTextureCompute.SetVector("z", ChannelToMask(z));
-			swizzleTextureCompute.SetVector("w", ChannelToMask(w));
-			Dispatch(swizzleTextureCompute, texture.width, texture.height, 1, 0);
+			else
+			{
+				Graphics.Blit(source, target);
+			}
 		}
-
 		/// Sets all pixels of supplied texture to 0
 		public static void ClearRenderTexture(RenderTexture source)
 		{
