@@ -14,7 +14,6 @@
 		public const GraphicsFormat defaultGraphicsFormat = GraphicsFormat.R16G16B16A16_SFloat; //GraphicsFormat.R8G8B8A8_UNorm;
 
 		public const TextureWrapMode defaultWrapMode = TextureWrapMode.Clamp;
-		public const TextureFormat defaultTextureFormat = TextureFormat.RGBAFloat;
 
 		static ComputeShader normalizeTextureCompute;
 		static ComputeShader clearTextureCompute;
@@ -144,7 +143,7 @@
 				}
 				texture.Create();
 			}
-			texture.wrapMode = TextureWrapMode.Clamp;
+			texture.wrapMode = defaultWrapMode;
 			texture.filterMode = filterMode;
 		}
 

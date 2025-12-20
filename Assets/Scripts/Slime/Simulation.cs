@@ -22,7 +22,6 @@ public class Simulation : MonoBehaviour
 	public GraphicsFormat format = ComputeHelper.defaultGraphicsFormat;
 	public GraphicsFormat volumeFormat = GraphicsFormat.R16_SFloat;
 
-
 	[Header("Render Settings")]
 	[Range(0, 1)]
 	public float opacity = 1.0f;
@@ -116,7 +115,9 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("moveSpeed", s.moveSpeed);
 		compute.SetFloat("turnSpeed", s.turnSpeed / 180f);
 		compute.SetFloat("sensorOffsetDst", s.sensorOffsetDst);
-		compute.SetInt("sensorSize", s.sensorSize);
+
+		// assumed sensorSize=1 -> compiled loop unrolling
+		// compute.SetInt("sensorSize", s.sensorSize);
 
 		// Precompute trig once per frame
 		float angleRad = s.sensorAngleSpacing * Mathf.Deg2Rad;

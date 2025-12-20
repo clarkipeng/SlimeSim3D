@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: A
   m_EditorClassIdentifier: 
   stepsPerFrame: 1
-  width: 300
-  height: 300
-  depth: 300
+  width: 500
+  height: 500
+  depth: 500
   numAgents: 250000
   spawnMode: 2
   trailWeight: 5
@@ -27,4 +27,4 @@ MonoBehaviour:
     sensorAngleSpacing: 30
     sensorOffsetDst: 8
     sensorSize: 1
-    color: {r: 0, g: 1, b: 0.19657993, a: 0}
+    color: {r: 1, g: 1, b: 1, a: 0}

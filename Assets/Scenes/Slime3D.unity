@@ -174,7 +174,7 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: 17e98c20846d94d1db264dff24960cba, type: 2}
   filterMode: 0
   format: 48
-  volumeFormat: 45
+  volumeFormat: 5
   opacity: 1
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}

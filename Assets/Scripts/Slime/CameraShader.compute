@@ -21,11 +21,12 @@ struct Ray
     float3 direction;
 };
 
-bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax){
-    float3 invDir = 1.0 / rd;
+bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax)
+{
+    float3 invDir = 1.0f / rd;
 
-    float3 t0 = (-0.5 - ro) * invDir;
-    float3 t1 = (0.5 - ro) * invDir;
+    float3 t0 = (-0.5f - ro) * invDir;
+    float3 t1 = (0.5f - ro) * invDir;
 
     float3 tmin3 = min(t0, t1);
     float3 tmax3 = max(t0, t1);
@@ -33,7 +34,7 @@ bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax){
     tmin = max(max(tmin3.x, tmin3.y), tmin3.z);
     tmax  = min(min(tmax3.x, tmax3.y), tmax3.z);
 
-    return tmax >= max(tmin, 0.0);
+    return tmax >= max(tmin, 0.0f);
 }
 
 // float3 Trace(Ray ray)
@@ -123,69 +124,56 @@ float3 Trace(Ray ray)
     if (!IntersectBox(ray.origin, ray.direction, tin, tout))
         return float3(0,0,0);
 
-    tin = max(0.0, tin);
-    if (tin >= tout) return float3(0,0,0);
-    float stepSize = 1.0 / (width * 2.0);
-
-    float3 pos = ray.origin + ray.direction * (tin + 0.01);
-    float3 stepVec = ray.direction * stepSize;
-    
-    float dist = tout - tin;
-    int maxSteps = int(dist / stepSize);
-    
-    float accum = 0.0;
+    tin = max(0.0f, tin);
+    if (tin >= tout) return float3(0.0f,0.0f,0.0f);
 
     float3 dims = float3(width, height, depth);
+    // float stepSize = 0.5 / width;
+    float stepSize = 0.01f;
+
+    float3 startPos = ray.origin + ray.direction * (tin + 1e-4);
+    float3 posVoxel = (startPos + 0.5f) * dims;
+    float3 stepVecVoxel = (ray.direction * stepSize) * dims;
+    int maxSteps = int((tout - tin) / stepSize);
+    
+    float trans = 1.0f;
 
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
-        float3 uv = pos + 0.5;
-        if (any(uv < 0) || any(uv > 1)) break;
-        int3 voxelCoord = int3(uv * dims);
-        float alpha = TrailMap[voxelCoord]; 
-        alpha *= opacity; 
-        accum += alpha * (1.0 - accum);
-        if (accum >= 0.98) 
-        {
-            accum = 1.0;
-            break; 
-        }
-        pos += stepVec;
+        float alpha = TrailMap[int3(posVoxel)] * opacity;
+        trans *= (1.0f - alpha);
+        if (trans < 0.02f) break;
+        posVoxel += stepVecVoxel;
     }
-    return color.rgb * accum;
+    return color.rgb * (1.0f - trans);
 }
 
-Ray CreateRay(float3 origin, float3 direction)
-{
-    Ray ray;
-    ray.origin = origin;
-    ray.direction = direction;
-    return ray;
-}
 Ray CreateCameraRay(float2 uv)
 {
     float3 origin = mul(cameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
     float3 direction = mul(cameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
     direction = mul(cameraToWorld, float4(direction, 0.0f)).xyz;
     direction = normalize(direction);
-
-    return CreateRay(origin, direction);
+    
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    return ray;
 }
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-    // Get the dimensions of the RenderTexture
-    uint width, height;
-    Result.GetDimensions(width, height);
+    uint w, h;
+    Result.GetDimensions(w, h);
 
-    // Transform pixel to [-1,1] range
-    float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
+    float2 uv = (id.xy + 0.5f);
+    uv.x /= w;
+    uv.y /= h;
+    uv = uv * 2.0f - 1.0f;
 
-    // Get a ray for the UVs
     Ray ray = CreateCameraRay(uv);
-
     float3 result = Trace(ray);
-    Result[id.xy] = float4(result, 1);
+    Result[id.xy] = float4(result, 1.0f);
 }
