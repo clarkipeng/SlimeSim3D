@@ -1,80 +1,49 @@
 ﻿#pragma kernel Update
 
-struct Agent {
-	float3 position;
-	float pad0;
-	
-	float3 direction;
-	float pad1;
-};
-
-half moveSpeed;
-half turnSpeed; // turnspeed/180
-
-half sensorOffsetDst;
-
-half cosAngle; // cos(sensorAngle * 3.1415/180)
-half sinAngle; // sin(sensorAngle * 3.1415/180)
-
-RWStructuredBuffer<Agent> agents;
-uint numAgents;
-
-RWTexture3D<float> TrailMap;
-
-int width;
-int height;
-int depth;
-
-half trailWeight;
-
+//consts
+float3 invSize;
 float deltaTime;
 float time;
 
-// Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
-uint hash(uint state)
-{
-    state ^= 2747636419u;
-    state *= 2654435769u;
-    state ^= state >> 16;
-    state *= 2654435769u;
-    state ^= state >> 16;
-    state *= 2654435769u;
-    return state;
-}
+half moveSpeed;
+half turnSpeed;
+half sensorOffsetDst;
+half cosAngle;
+half sinAngle;
 
-float scaleToRange01(uint state)
-{
-    // return state / 4294967295.0;
-	return state * 2.3283064365386963e-10; // 1/2^32
-}
+uint numAgents;
+int width, height, depth;
 
+half trailWeight;
+
+Texture3D<half> ReadTrailMap; 
+SamplerState samplerReadTrailMap;
+RWTexture3D<float> WriteTrailMap;
+
+struct Agent {
+	float3 position;
+	float pad0;
+	float3 direction;
+	uint rngState;
+};
+RWStructuredBuffer<Agent> agents;
+
+// LCG Random
+// float NextFloat(inout uint state) {
+//     state = state * 747796405 + 2891336453;
+//     float result = ((state >> ((state >> 28) + 4)) ^ state) * 2.77555756e-17;
+//     return result;
+// }
+float NextFloat(inout uint state) 
+{
+    state = state * 1664525u + 1013904223u;
+    return float(state) * (1.0 / 4294967296.0);
+}
 
 half sense(Agent agent, float3 sensorDir) {
     float3 sensorPos = agent.position + sensorDir * sensorOffsetDst;
-    
-    // Check bounds (optional but safe)
-    if (any(sensorPos < 0) || any(sensorPos >= float3(width, height, depth))) {
-        return 0;
-    }
-	half sum = 0.0;
-
-	int sensorSize=1; //assumed
-
-	[unroll]
-	for (int offsetX = -sensorSize; offsetX <= sensorSize; offsetX ++) {
-        for (int offsetY = -sensorSize; offsetY <= sensorSize; offsetY ++) {
-            for (int offsetZ = -sensorSize; offsetZ <= sensorSize; offsetZ ++) {
-
-				int sampleX = min(width - 1, max(0, sensorPos.x + offsetX));
-				int sampleY = min(height - 1, max(0, sensorPos.y + offsetY));
-				int sampleZ = min(depth - 1, max(0, sensorPos.z + offsetZ));
-				sum += TrailMap[int3(sampleX,sampleY,sampleZ)];
-            }
-        }
-    }
-
-    return sum;
-	// return TrailMap[sensorPos];
+    float3 uv = (sensorPos + 0.5) * invSize;
+    return ReadTrailMap.SampleLevel(samplerReadTrailMap, uv, 0);
 }
 
 [numthreads(256,1,1)]
@@ -87,304 +56,79 @@ void Update (uint3 id : SV_DispatchThreadID)
 	Agent agent = agents[id.x];
 	float3 pos = agent.position;
 
-	uint random = hash(pos.x + pos.y * width + pos.z * width * height + hash(id.x + time * 100000));
-
 	float3 helper = abs(agent.direction.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
 	float3 agentRight = normalize(cross(agent.direction, helper));
 	float3 agentUp    = cross(agentRight, agent.direction);
 
 	half weightForward = sense(agent, agent.direction);
-	half weightLeft = sense(agent, agent.direction * cosAngle + agentRight * -sinAngle);
-	half weightRight = sense(agent, agent.direction * cosAngle + agentRight * sinAngle);
-	half weightDown = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
-	half weightUp = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
+	half weightLeft    = sense(agent, agent.direction * cosAngle + agentRight * -sinAngle);
+	half weightRight   = sense(agent, agent.direction * cosAngle + agentRight * sinAngle);
+	half weightDown    = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
+	half weightUp      = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
 
 	half maxWeightRadial = max(max(weightLeft, weightRight), max(weightUp, weightDown));
 	half minWeightRadial = min(min(weightLeft, weightRight), min(weightUp, weightDown));
 	
-	float randomSteerStrength = scaleToRange01(random);
+	float rand = NextFloat(agent.rngState);
 
 	// Continue in same direction
 	if (weightForward > maxWeightRadial) {
-		agent.direction += 0;
 	}
 	else if (weightForward < minWeightRadial || maxWeightRadial == minWeightRadial) {
-		float3 randomDir = (randomSteerStrength - 0.5) *  agentRight + (scaleToRange01(hash(random+1)) - 0.5) * agentUp;
+		float3 randomDir = (rand - 0.5) *  agentRight + (NextFloat(agent.rngState) - 0.5) * agentUp;
     	agent.direction += randomDir * turnSpeed;
 	}
-	// Turn right
-	else if (weightRight==maxWeightRadial) {
-		agent.direction += agentRight * turnSpeed * randomSteerStrength;
-	}
-	// Turn left
-	else if (weightLeft == maxWeightRadial) {
-		agent.direction -= agentRight * turnSpeed * randomSteerStrength;
-	}
-	// Turn up
-	else if (weightUp == maxWeightRadial) {
-		agent.direction += agentUp * turnSpeed * randomSteerStrength;
-	}
-	// Turn down
-	else if (weightDown == maxWeightRadial) {
-		agent.direction -= agentUp * turnSpeed * randomSteerStrength;
-	}
-	agent.direction = normalize(agent.direction);
+	else if (weightRight==maxWeightRadial ) agent.direction += agentRight * turnSpeed * rand;
+	else if (weightLeft == maxWeightRadial) agent.direction -= agentRight * turnSpeed * rand;
+	else if (weightUp == maxWeightRadial  )	agent.direction += agentUp * turnSpeed * rand;
+	else if (weightDown == maxWeightRadial) agent.direction -= agentUp * turnSpeed * rand;
 
-	// Update position
+	agent.direction = normalize(agent.direction);
 	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
 
 	// Clamp position to map boundaries, and pick new random move dir if hit boundary
 	if (newPos.x < 0 || newPos.x >= width || newPos.y < 0 || newPos.y >= height || newPos.z < 0 || newPos.z >= depth) {
-		random = hash(random);
-		uint random1 = hash(random);
-		uint random2 = hash(random1);
-		newPos.x = min(width-1,max(0, newPos.x));
-		newPos.y = min(height-1,max(0, newPos.y));
-		newPos.z = min(depth-1,max(0, newPos.z));
-		agent.direction =  normalize(float3(scaleToRange01(random) - 0.5, scaleToRange01(random1) - 0.5, scaleToRange01(random2) - 0.5));
+		newPos = min(float3(width, height, depth), max(0.0f, newPos));
+		float r1 = NextFloat(agent.rngState); 
+        float r2 = NextFloat(agent.rngState);
+        float r3 = NextFloat(agent.rngState);
+		agent.direction = normalize(float3(r1 - 0.5, r2 - 0.5, r3 - 0.5));
 	}
-	else {
-		int3 coord = int3(newPos);
-		half oldTrail = TrailMap[coord];
-		TrailMap[coord] = min(1.0h, max(0.0h, oldTrail + trailWeight));
-	}
+	WriteTrailMap[int3(newPos)] += trailWeight;
 	
-	agents[id.x].position = newPos;
-	agents[id.x].direction = agent.direction;
+	agent.position = newPos;
+	agents[id.x] = agent;
 }
 
 #pragma kernel Diffuse
 
-half decayRate;
-half diffuseRate;
+half diffuseFactor;
+half decayFactor;
+
+Texture3D<half> TrailMap;
+SamplerState samplerTrailMap;
 RWTexture3D<float> DiffusedTrailMap;
 
-[numthreads(8,8,8)]
+[numthreads(8,8,4)]
 void Diffuse (uint3 id : SV_DispatchThreadID)
 {
-	if (id.x < 0 || id.x >= (uint)width || id.y < 0 || id.y >= (uint)height || id.z < 0 || id.z >= (uint)depth) {
-		return;
-	}
+	if (any(id >= uint3(width, height, depth))) return;
 
-	// Von Neumann neighborhood blur
-	half sum = TrailMap[id.xyz];
-	sum += TrailMap[int3(max(0, id.x-1), id.y, id.z)];
-    sum += TrailMap[int3(min(width-1, id.x+1), id.y, id.z)];
-    
-    sum += TrailMap[int3(id.x, max(0, id.y-1), id.z)];
-    sum += TrailMap[int3(id.x, min(height-1, id.y+1), id.z)];
-    
-    sum += TrailMap[int3(id.x, id.y, max(0, id.z-1))];
-    sum += TrailMap[int3(id.x, id.y, min(depth-1, id.z+1))];
+	float3 uv = (id + 0.5f) * invSize;
+
+	half sum = TrailMap.SampleLevel(samplerTrailMap, uv, 0);
+
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3(-1, 0, 0));
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 1, 0, 0));
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0,-1, 0));
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 1, 0));
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0,-1));
+    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0, 1));
+
+	half original = TrailMap[id];
+
+    half blurred = sum * 0.142857h;
+    half result = lerp(original, blurred, diffuseFactor);
 	
-
-	half blurredCol = sum * 0.14285714;
-	half diffuseWeight = saturate(diffuseRate * (half)deltaTime);
-	blurredCol = TrailMap[id.xyz] * (1 - diffuseWeight) + blurredCol * (diffuseWeight);
-
-	DiffusedTrailMap[id.xyz] = max(0.0h, blurredCol - decayRate * (half)deltaTime);
+    DiffusedTrailMap[id] = max(0.0h, result - decayFactor);
 }
-
-
-// #pragma kernel Update
-
-// // fast sampling
-// SamplerState samplerTrailMap;
-// float3 invSize;
-
-// struct Agent {
-// 	float3 position;
-// 	float pad0;
-	
-// 	float3 direction;
-// 	float pad1;
-// };
-
-
-// half moveSpeed;
-// half turnSpeed; // turnspeed/180
-
-// half sensorOffsetDst;
-
-// half cosAngle; // cos(sensorAngle * 3.1415/180)
-// half sinAngle; // sin(sensorAngle * 3.1415/180)
-
-// RWStructuredBuffer<Agent> agents;
-// uint numAgents;
-
-// RWTexture3D<float> TrailMap;
-
-// int width;
-// int height;
-// int depth;
-
-// half trailWeight;
-
-// float deltaTime;
-// float time;
-
-// // Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
-// uint hash(uint state)
-// {
-//     state ^= 2747636419u;
-//     state *= 2654435769u;
-//     state ^= state >> 16;
-//     state *= 2654435769u;
-//     state ^= state >> 16;
-//     state *= 2654435769u;
-//     return state;
-// }
-
-// float scaleToRange01(uint state)
-// {
-//     // return state / 4294967295.0;
-// 	return state * 2.3283064365386963e-10; // 1/2^32
-// }
-
-
-// half sense(Agent agent, float3 sensorDir) {
-//     float3 sensorPos = agent.position + sensorDir * sensorOffsetDst;
-//     float3 uv = (sensorPos + 0.5) * invSize;
-// 	return TrailMap.SampleLevel(samplerTrailMap, uv, 0);
-// }
-
-// [numthreads(256,1,1)]
-// void Update (uint3 id : SV_DispatchThreadID)
-// {
-// 	if (id.x >= numAgents) {
-// 		return;
-// 	}
-
-// 	Agent agent = agents[id.x];
-// 	float3 pos = agent.position;
-
-// 	uint random = hash(pos.x + pos.y * width + pos.z * width * height + hash(id.x + time * 100000));
-
-// 	float3 helper = abs(agent.direction.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
-// 	float3 agentRight = normalize(cross(agent.direction, helper));
-// 	float3 agentUp    = cross(agentRight, agent.direction);
-
-// 	half weightForward = sense(agent, agent.direction);
-// 	half weightLeft = sense(agent, agent.direction * cosAngle + agentRight * -sinAngle);
-// 	half weightRight = sense(agent, agent.direction * cosAngle + agentRight * sinAngle);
-// 	half weightDown = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
-// 	half weightUp = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
-
-// 	half maxWeightRadial = max(max(weightLeft, weightRight), max(weightUp, weightDown));
-// 	half minWeightRadial = min(min(weightLeft, weightRight), min(weightUp, weightDown));
-	
-// 	float randomSteerStrength = scaleToRange01(random);
-
-// 	// Continue in same direction
-// 	if (weightForward > maxWeightRadial) {
-// 		agent.direction += 0;
-// 	}
-// 	else if (weightForward < minWeightRadial || maxWeightRadial == minWeightRadial) {
-// 		float3 randomDir = (randomSteerStrength - 0.5) *  agentRight + (scaleToRange01(hash(random+1)) - 0.5) * agentUp;
-//     	agent.direction += randomDir * turnSpeed;
-// 	}
-// 	// Turn right
-// 	else if (weightRight==maxWeightRadial) {
-// 		agent.direction += agentRight * turnSpeed * randomSteerStrength;
-// 	}
-// 	// Turn left
-// 	else if (weightLeft == maxWeightRadial) {
-// 		agent.direction -= agentRight * turnSpeed * randomSteerStrength;
-// 	}
-// 	// Turn up
-// 	else if (weightUp == maxWeightRadial) {
-// 		agent.direction += agentUp * turnSpeed * randomSteerStrength;
-// 	}
-// 	// Turn down
-// 	else if (weightDown == maxWeightRadial) {
-// 		agent.direction -= agentUp * turnSpeed * randomSteerStrength;
-// 	}
-// 	agent.direction = normalize(agent.direction);
-
-// 	// Update position
-// 	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
-
-// 	// Clamp position to map boundaries, and pick new random move dir if hit boundary
-// 	if (newPos.x < 0 || newPos.x >= width || newPos.y < 0 || newPos.y >= height || newPos.z < 0 || newPos.z >= depth) {
-// 		random = hash(random);
-// 		uint random1 = hash(random);
-// 		uint random2 = hash(random1);
-// 		newPos.x = min(width-1,max(0, newPos.x));
-// 		newPos.y = min(height-1,max(0, newPos.y));
-// 		newPos.z = min(depth-1,max(0, newPos.z));
-// 		agent.direction = normalize(float3(scaleToRange01(random) - 0.5, scaleToRange01(random1) - 0.5, scaleToRange01(random2) - 0.5));
-// 	}
-// 	else {
-// 		int3 coord = int3(newPos);
-// 		half oldTrail = TrailMap[coord];
-// 		TrailMap[coord] = min(1.0h, max(0.0h, oldTrail + trailWeight));
-// 	}
-	
-// 	agents[id.x].position = newPos;
-// 	agents[id.x].direction = agent.direction;
-// }
-
-// // #pragma kernel Diffuse
-
-// // half decayRate;
-// // half diffuseRate;
-// // RWTexture3D<float> DiffusedTrailMap;
-
-// // [numthreads(8,8,8)]
-// // void Diffuse (uint3 id : SV_DispatchThreadID)
-// // {
-// // 	if (id.x < 0 || id.x >= (uint)width || id.y < 0 || id.y >= (uint)height || id.z < 0 || id.z >= (uint)depth) {
-// // 		return;
-// // 	}
-
-// // 	// Von Neumann neighborhood blur
-// // 	half sum = TrailMap[id.xyz];
-// // 	sum += TrailMap[int3(max(0, id.x-1), id.y, id.z)];
-// //     sum += TrailMap[int3(min(width-1, id.x+1), id.y, id.z)];
-    
-// //     sum += TrailMap[int3(id.x, max(0, id.y-1), id.z)];
-// //     sum += TrailMap[int3(id.x, min(height-1, id.y+1), id.z)];
-    
-// //     sum += TrailMap[int3(id.x, id.y, max(0, id.z-1))];
-// //     sum += TrailMap[int3(id.x, id.y, min(depth-1, id.z+1))];
-	
-
-// // 	half blurredCol = sum * 0.14285714;
-// // 	half diffuseWeight = saturate(diffuseRate * (half)deltaTime);
-// // 	blurredCol = TrailMap[id.xyz] * (1 - diffuseWeight) + blurredCol * (diffuseWeight);
-
-// // 	DiffusedTrailMap[id.xyz] = max(0.0h, blurredCol - decayRate * (half)deltaTime);
-// // }
-
-
-// #pragma kernel Diffuse
-
-// half diffuseFactor;
-// half decayFactor;
-
-// Texture3D<half> TrailMap;
-// RWTexture3D<float> DiffusedTrailMap;
-
-// [numthreads(8,8,8)]
-// void Diffuse (uint3 id : SV_DispatchThreadID)
-// {
-// 	if (any(id >= uint3(width, height, depth))) return;
-
-// 	float3 uv = (id + 0.5f) * invSize;
-//     float3 d = invSize;
-
-// 	half sum = TrailMap.SampleLevel(samplerTrailMap, uv, 0);
-
-// 	sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3(-d.x, 0, 0), 0);
-//     sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3( d.x, 0, 0), 0);
-//     sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3( 0, -d.y, 0), 0);
-//     sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3( 0, d.y, 0), 0);
-//     sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3( 0, 0, -d.z), 0);
-//     sum += TrailMap.SampleLevel(samplerTrailMap, uv + float3( 0, 0, d.z), 0);
-
-// 	half original = TrailMap[id];
-//     half blurred = sum * 0.142857h;
-//     half result = lerp(original, blurred, diffuseFactor);
-	
-//     DiffusedTrailMap[id] = max(0.0h, result - decayFactor);
-// }

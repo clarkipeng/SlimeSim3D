@@ -20,7 +20,7 @@ public class Simulation : MonoBehaviour
 	[Header("Display Settings")]
 	public FilterMode filterMode = FilterMode.Point;
 	public GraphicsFormat format = ComputeHelper.defaultGraphicsFormat;
-	public GraphicsFormat volumeFormat = GraphicsFormat.R16_SFloat;
+	public GraphicsFormat volumeFormat = GraphicsFormat.R8_UNorm;
 
 	[Header("Render Settings")]
 	[Range(0, 1)]
@@ -93,7 +93,7 @@ public class Simulation : MonoBehaviour
 				direction = randomDirection;
 			}
 
-			agents[i] = new Agent() { position = startPos, direction = direction };
+			agents[i] = new Agent() { position = startPos, direction = direction, pad0 = 0.0f, rngState = (uint)Random.Range(1, 10000000) };
 		}
 
 		ComputeHelper.CreateAndSetBuffer<Agent>(ref agentBuffer, agents, compute, "agents", updateKernel);
@@ -124,9 +124,11 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("cosAngle", Mathf.Cos(angleRad));
 		compute.SetFloat("sinAngle", Mathf.Sin(angleRad));
 
+		compute.SetVector("invSize", new Vector3(1.0f / settings.width, 1.0f / settings.height, 1.0f / settings.depth));
+
 		compute.SetFloat("trailWeight", settings.trailWeight);
-		compute.SetFloat("decayRate", settings.decayRate);
-		compute.SetFloat("diffuseRate", settings.diffuseRate);
+		// compute.SetFloat("decayRate", settings.decayRate);
+		// compute.SetFloat("diffuseRate", settings.diffuseRate);
 	}
 
 	void FixedUpdate()
@@ -155,20 +157,37 @@ public class Simulation : MonoBehaviour
 		drawShader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
 		drawShader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
 
-		drawShader.SetTexture(drawKernel, "TrailMap", trailMap);
-
 		ComputeHelper.Dispatch(drawShader, Screen.width, Screen.height, 1, kernelIndex: drawKernel);
 	}
 
 	void RunSimulation()
 	{
-		compute.SetFloat("deltaTime", Time.deltaTime);
+		float dt = Time.deltaTime;
+		compute.SetFloat("deltaTime", dt);
 		compute.SetFloat("time", Time.time);
 
-		ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
+		compute.SetFloat("diffuseFactor", Mathf.Clamp01(settings.diffuseRate * dt));
+		compute.SetFloat("decayFactor", settings.decayRate * dt);
+		compute.SetFloat("trailWeight", settings.trailWeight);
+
+		// ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
+		// ComputeHelper.Dispatch(compute, settings.width, settings.height, settings.depth, kernelIndex: diffuseMapKernel);
+
+		// ComputeHelper.CopyRenderTexture(diffusedTrailMap, trailMap);
+
+		bool isEvenFrame = Time.frameCount % 2 == 0;
+		RenderTexture sourceTex = isEvenFrame ? trailMap : diffusedTrailMap;
+		RenderTexture destTex = isEvenFrame ? diffusedTrailMap : trailMap;
+
+		compute.SetTexture(diffuseMapKernel, "TrailMap", sourceTex);
+		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", destTex);
 		ComputeHelper.Dispatch(compute, settings.width, settings.height, settings.depth, kernelIndex: diffuseMapKernel);
 
-		ComputeHelper.CopyRenderTexture(diffusedTrailMap, trailMap);
+		compute.SetTexture(updateKernel, "ReadTrailMap", sourceTex);
+		compute.SetTexture(updateKernel, "WriteTrailMap", destTex);
+		ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
+
+		drawShader.SetTexture(drawKernel, "TrailMap", destTex);
 	}
 
 	void OnDestroy()
@@ -182,6 +201,6 @@ public class Simulation : MonoBehaviour
 		public float pad0;
 
 		public Vector3 direction;
-		public float pad1;
+		public uint rngState;
 	}
 }
