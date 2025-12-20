@@ -132,6 +132,7 @@ GameObject:
   m_Component:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
+  - component: {fileID: 178986027}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -173,13 +174,36 @@ MonoBehaviour:
   settings: {fileID: 11400000, guid: 17e98c20846d94d1db264dff24960cba, type: 2}
   filterMode: 0
   format: 48
+  volumeFormat: 45
   opacity: 1
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
-  colorTexture: {fileID: 0}
   displayTexture: {fileID: 0}
   outputImage: {fileID: 506224651}
   camera: {fileID: 963194227}
+--- !u!114 &178986027
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bfed1c6ce4d1c4aeca2ec86c4d9f998f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  simulation: {fileID: 178986026}
+  orbitCamera: {fileID: 963194229}
+  benchmarkSettings: {fileID: 11400000, guid: cd5fc51b419df47b098b808c7de8e3ae, type: 2}
+  triggerKey: 98
+  warmupFrames: 5
+  testFrames: 60
+  startAngle: 0
+  endAngle: 360
+  startPitch: 0
+  startRadius: 10
+  endRadius: 1
 --- !u!1 &506224650
 GameObject:
   m_ObjectHideFlags: 0
@@ -359,8 +383,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   target: {fileID: 1248530623}
   rotateSpeed: 5
-  distance: 10
   zoomSpeed: 2
+  minDistance: 1
+  maxDistance: 100
+  distance: 10
+  yaw: 0
+  pitch: 0
   gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &1066109336
 GameObject:

@@ -3,7 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.UI;
 using ComputeShaderUtility;
 
-public class Test : MonoBehaviour
+public class TestRender : MonoBehaviour
 {
     const int updateKernel = 0;
     const int diffuseMapKernel = 1;

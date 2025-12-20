@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2665318e53759e74db7a2d8238331945, type: 3}
-  m_Name: A
+  m_Name: BenchmarkSetting
   m_EditorClassIdentifier: 
-  stepsPerFrame: 1
-  width: 100
-  height: 100
-  depth: 100
-  numAgents: 1000
-  spawnMode: 1
+  stepsPerFrame: 10
+  width: 300
+  height: 300
+  depth: 300
+  numAgents: 250000
+  spawnMode: 2
   trailWeight: 5
-  decayRate: 1
-  diffuseRate: 1
-  speciesSettings:
-  - moveSpeed: 10
+  decayRate: 0.2
+  diffuseRate: 3
+  speciesSetting:
+    moveSpeed: 10
     turnSpeed: 30
-    sensorAngleSpacing: 60
-    sensorOffsetDst: 2
+    sensorAngleSpacing: 30
+    sensorOffsetDst: 8
     sensorSize: 1
-    colour: {r: 1, g: 1, b: 1, a: 0}
+    color: {r: 0, g: 1, b: 0.19657993, a: 0}

@@ -20,7 +20,7 @@ public class SlimeSettings : ScriptableObject
 	public float decayRate = 1;
 	public float diffuseRate = 1;
 
-	public SpeciesSettings[] speciesSettings;
+	public SpeciesSettings speciesSetting;
 
 	[System.Serializable]
 	public struct SpeciesSettings
@@ -35,6 +35,6 @@ public class SlimeSettings : ScriptableObject
 		[Min(1)] public int sensorSize;
 
 		[Header("Display settings")]
-		public Color colour;
+		public Color color;
 	}
 }

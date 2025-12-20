@@ -2,38 +2,25 @@
 
 struct Agent {
 	float3 position;
-	float padding0;
+	float pad0;
 	
 	float3 direction;
-	float padding1;
-	// float3 up;
-
-	int3 speciesMask;
-	int speciesIndex;
+	float pad1;
 };
 
-struct SpeciesSettings {
-	float moveSpeed;
-	float turnSpeed;
+float moveSpeed;
+float turnSpeed; // turnspeed/180
 
-	float sensorAngleDegrees;
-	float sensorOffsetDst;
-	int sensorSize;
+float sensorOffsetDst;
+int sensorSize;
 
-	float padding0;
-    float padding1;
-    float padding2;
-
-	float4 colour;
-};
-
-StructuredBuffer<SpeciesSettings> speciesSettings;
-uint numSpecies;
+float cosAngle; // cos(sensorAngle * 3.1415/180)
+float sinAngle; // sin(sensorAngle * 3.1415/180)
 
 RWStructuredBuffer<Agent> agents;
 uint numAgents;
 
-RWTexture3D<float4> TrailMap;
+RWTexture3D<float> TrailMap;
 
 int width;
 int height;
@@ -58,32 +45,33 @@ uint hash(uint state)
 
 float scaleToRange01(uint state)
 {
-    return state / 4294967295.0;
+    // return state / 4294967295.0;
+	return state * 2.3283064365386963e-10; // 1/2^32
 }
 
 
-float sense(Agent agent, SpeciesSettings settings, float3 sensorDir) {
-	float3 sensorPos = agent.position + sensorDir * settings.sensorOffsetDst;
-	int sensorCentreX = (int) sensorPos.x;
-	int sensorCentreY = (int) sensorPos.y;
-	int sensorCentreZ = (int) sensorPos.z;
+float sense(Agent agent, float3 sensorDir) {
+    float3 sensorPos = agent.position + sensorDir * sensorOffsetDst;
+    
+    // Check bounds (optional but safe)
+    if (any(sensorPos < 0) || any(sensorPos >= float3(width, height, depth))) {
+        return 0;
+    }
+	float sum = 0.0;
+	for (int offsetX = -sensorSize; offsetX <= sensorSize; offsetX ++) {
+        for (int offsetY = -sensorSize; offsetY <= sensorSize; offsetY ++) {
+            for (int offsetZ = -sensorSize; offsetZ <= sensorSize; offsetZ ++) {
 
-	float sum = 0;
+				int sampleX = min(width - 1, max(0, sensorPos.x + offsetX));
+				int sampleY = min(height - 1, max(0, sensorPos.y + offsetY));
+				int sampleZ = min(depth - 1, max(0, sensorPos.z + offsetZ));
+				sum += TrailMap[int3(sampleX,sampleY,sampleZ)];
+            }
+        }
+    }
 
-	int4 senseWeight = int4(agent.speciesMask,0) * 2 - 1;
-
-	for (int offsetX = -settings.sensorSize; offsetX <= settings.sensorSize; offsetX ++) {
-		for (int offsetY = -settings.sensorSize; offsetY <= settings.sensorSize; offsetY ++) {
-			for (int offsetZ = -settings.sensorSize; offsetZ <= settings.sensorSize; offsetZ ++) {
-				int sampleX = min(width - 1, max(0, sensorCentreX + offsetX));
-				int sampleY = min(height - 1, max(0, sensorCentreY + offsetY));
-				int sampleZ = min(depth - 1, max(0, sensorCentreZ + offsetZ));
-				sum += dot(senseWeight, TrailMap[int3(sampleX,sampleY,sampleZ)]);
-			}
-		}
-	}
-
-	return sum;
+    return sum;
+	// return TrailMap[sensorPos];
 }
 
 [numthreads(256,1,1)]
@@ -94,31 +82,24 @@ void Update (uint3 id : SV_DispatchThreadID)
 	}
 
 	Agent agent = agents[id.x];
-	SpeciesSettings settings = speciesSettings[agent.speciesIndex];
 	float3 pos = agent.position;
 
 	uint random = hash(pos.x + pos.y * width + pos.z * width * height + hash(id.x + time * 100000));
-
-	// Steer based on sensory data
-	float sensorAngleRad = settings.sensorAngleDegrees * (3.1415 / 180);
-	float horizontal = cos(sensorAngleRad);
-	float radial = sin(sensorAngleRad);
 
 	float3 helper = abs(agent.direction.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
 	float3 agentRight = normalize(cross(agent.direction, helper));
 	float3 agentUp    = cross(agentRight, agent.direction);
 
-	float weightForward = sense(agent, settings, agent.direction);
-	float weightLeft = sense(agent, settings, agent.direction * horizontal + agentRight * -radial);
-	float weightRight = sense(agent, settings, agent.direction * horizontal + agentRight * radial);
-	float weightDown = sense(agent, settings, agent.direction * horizontal + agentUp * -radial);
-	float weightUp = sense(agent, settings, agent.direction * horizontal + agentUp * radial);
+	float weightForward = sense(agent, agent.direction);
+	float weightLeft = sense(agent, agent.direction * cosAngle + agentRight * -sinAngle);
+	float weightRight = sense(agent, agent.direction * cosAngle + agentRight * sinAngle);
+	float weightDown = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
+	float weightUp = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
 
 	float maxWeightRadial = max(max(weightLeft, weightRight), max(weightUp, weightDown));
 	float minWeightRadial = min(min(weightLeft, weightRight), min(weightUp, weightDown));
 	
 	float randomSteerStrength = scaleToRange01(random);
-	float turnSpeed = settings.turnSpeed / 180;
 
 	// Continue in same direction
 	if (weightForward > maxWeightRadial) {
@@ -147,7 +128,7 @@ void Update (uint3 id : SV_DispatchThreadID)
 	agent.direction = normalize(agent.direction);
 
 	// Update position
-	float3 newPos = agent.position + agent.direction * deltaTime * settings.moveSpeed;
+	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
 
 	// Clamp position to map boundaries, and pick new random move dir if hit boundary
 	if (newPos.x < 0 || newPos.x >= width || newPos.y < 0 || newPos.y >= height || newPos.z < 0 || newPos.z >= depth) {
@@ -161,8 +142,8 @@ void Update (uint3 id : SV_DispatchThreadID)
 	}
 	else {
 		int3 coord = int3(newPos);
-		float4 oldTrail = TrailMap[coord];
-		TrailMap[coord] = min(1, oldTrail + int4(agent.speciesMask,0) * trailWeight * deltaTime);
+		float oldTrail = TrailMap[coord];
+		TrailMap[coord] = min(1, oldTrail + trailWeight * deltaTime);
 	}
 	
 	agents[id.x].position = newPos;
@@ -173,7 +154,7 @@ void Update (uint3 id : SV_DispatchThreadID)
 
 float decayRate;
 float diffuseRate;
-RWTexture3D<float4> DiffusedTrailMap;
+RWTexture3D<float> DiffusedTrailMap;
 
 [numthreads(8,8,8)]
 void Diffuse (uint3 id : SV_DispatchThreadID)
@@ -182,43 +163,21 @@ void Diffuse (uint3 id : SV_DispatchThreadID)
 		return;
 	}
 
-	float4 sum = 0;
-	float4 originalCol = TrailMap[id.xyz];
-	// 3x3 blur
-	for (int offsetX = -1; offsetX <= 1; offsetX ++) {
-		for (int offsetY = -1; offsetY <= 1; offsetY ++) {
-			for (int offsetZ = -1; offsetZ <= 1; offsetZ ++) {
-				int sampleX = min(width-1, max(0, id.x + offsetX));
-				int sampleY = min(height-1, max(0, id.y + offsetY));
-				int sampleZ = min(depth-1, max(0, id.z + offsetZ));
-				sum += TrailMap[int3(sampleX,sampleY,sampleZ)];
-			}
-		}
-	}
+	// Von Neumann neighborhood blur
+	float sum = TrailMap[id.xyz];
+	sum += TrailMap[int3(max(0, id.x-1), id.y, id.z)];
+    sum += TrailMap[int3(min(width-1, id.x+1), id.y, id.z)];
+    
+    sum += TrailMap[int3(id.x, max(0, id.y-1), id.z)];
+    sum += TrailMap[int3(id.x, min(height-1, id.y+1), id.z)];
+    
+    sum += TrailMap[int3(id.x, id.y, max(0, id.z-1))];
+    sum += TrailMap[int3(id.x, id.y, min(depth-1, id.z+1))];
+	
 
-	float4 blurredCol = sum / 27;
+	float blurredCol = sum * 0.14285714;
 	float diffuseWeight = saturate(diffuseRate * deltaTime);
-	blurredCol = originalCol * (1 - diffuseWeight) + blurredCol * (diffuseWeight);
+	blurredCol = TrailMap[id.xyz] * (1 - diffuseWeight) + blurredCol * (diffuseWeight);
 
-	//DiffusedTrailMap[id.xy] = blurredCol * saturate(1 - decayRate * deltaTime);
 	DiffusedTrailMap[id.xyz] = max(0, blurredCol - decayRate * deltaTime);
-}
-
-#pragma kernel UpdateColorMap
-RWTexture3D<float4> ColorMap;
-[numthreads(8,8,8)]
-void UpdateColorMap (uint3 id : SV_DispatchThreadID)
-{
-	if (id.x < 0 || id.x >= (uint)width || id.y < 0 || id.y >= (uint)height || id.z < 0 || id.z >= (uint)depth) {
-		return;
-	}
-
-	float4 map = TrailMap[id.xyz];
-
-	float4 colour = 0;
-	for (uint i = 0; i < numSpecies; i ++) {
-		float4 mask = float4(i==0, i==1, i==2,i==3);
-		colour += speciesSettings[i].colour * dot(map, mask); 
-	}
-	ColorMap[id.xyz] = colour;
 }

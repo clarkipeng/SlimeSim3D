@@ -1,16 +1,19 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-Texture3D<float4> ColorMap;
-Texture3D<float4> TrailMap;
+// Texture3D<float> ColorMap;
+Texture3D<float> TrailMap;
 
 float4x4 cameraToWorld;
 float4x4 cameraInverseProjection;
 float opacity;
-uint numSpecies;
+float4 color;
+
+int width;
+int height;
+int depth;
 
 RWTexture2D<float4> Result;
-
 
 struct Ray
 {
@@ -33,89 +36,124 @@ bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax){
     return tmax >= max(tmin, 0.0);
 }
 
+// float3 Trace(Ray ray)
+// {
+//     float tin, tout;
+//     if (!IntersectBox(ray.origin, ray.direction, tin, tout))
+//     {
+//         return float3(0,0,0); // Background color
+//     }
+
+//     float t = max(tin, 0.0) + 1e-8;
+//     float3 pos = ray.origin + ray.direction * t;
+
+//     uint3 volumeDim;
+//     TrailMap.GetDimensions(volumeDim.x, volumeDim.y, volumeDim.z);
+    
+//     float3 uvw = pos + 0.5;
+//     float3 voxelPos = uvw * volumeDim;
+//     int3 voxel = int3(floor(voxelPos));
+
+//     int3 step = sign(ray.direction);
+//     float3 tDelta = abs(1.0 / (ray.direction * volumeDim));
+
+//     float3 distToNextBoundary;
+//     distToNextBoundary.x = (step.x > 0) ? floor(voxelPos.x + 1.0) - voxelPos.x : voxelPos.x - floor(voxelPos.x);    
+//     distToNextBoundary.y = (step.y > 0) ? floor(voxelPos.y + 1.0) - voxelPos.y : voxelPos.y - floor(voxelPos.y);
+//     distToNextBoundary.z = (step.z > 0) ? floor(voxelPos.z + 1.0) - voxelPos.z : voxelPos.z - floor(voxelPos.z);
+
+//     float3 tMax = t + (distToNextBoundary * tDelta);
+//     float accum = 0.0;
+
+//     [loop]
+//     while (t < tout)
+//     {
+//         if (all(voxel >= 0) && all(voxel < int3(volumeDim)))
+//         {
+//             float alpha = TrailMap[voxel];
+//             alpha = alpha * opacity;
+
+//             accum += alpha * (1.0 - accum);
+//             // if (alpha > 0.0) {
+//             //     accum = 1.0;
+//             //     break;
+//             // }
+
+//             if (accum >= 0.99) break; // Early exit if opaque
+//         }
+//         if (tMax.x < tMax.y)
+//         {
+//             if (tMax.x < tMax.z)
+//             {
+//                 voxel.x += step.x;
+//                 t = tMax.x;
+//                 tMax.x += tDelta.x;
+//             }
+//             else
+//             {
+//                 voxel.z += step.z;
+//                 t = tMax.z;
+//                 tMax.z += tDelta.z;
+//             }
+//         }
+//         else
+//         {
+//             if (tMax.y < tMax.z)
+//             {
+//                 voxel.y += step.y;
+//                 t = tMax.y;
+//                 tMax.y += tDelta.y;
+//             }
+//             else
+//             {
+//                 voxel.z += step.z;
+//                 t = tMax.z;
+//                 tMax.z += tDelta.z;
+//             }
+//         }
+//     }
+
+//     float4 dst = float4(color.rgb * accum, 1.0);
+//     return dst.rgb;
+// }
+
 float3 Trace(Ray ray)
 {
     float tin, tout;
     if (!IntersectBox(ray.origin, ray.direction, tin, tout))
-    {
-        return float3(0,0,0); // Background color
-    }
+        return float3(0,0,0);
 
-    float t = max(tin, 0.0) + 1e-8;
-    float3 pos = ray.origin + ray.direction * t;
+    tin = max(0.0, tin);
+    if (tin >= tout) return float3(0,0,0);
+    float stepSize = 1.0 / (width * 2.0);
 
-    uint3 volumeDim;
-    ColorMap.GetDimensions(volumeDim.x, volumeDim.y, volumeDim.z);
+    float3 pos = ray.origin + ray.direction * (tin + 0.01);
+    float3 stepVec = ray.direction * stepSize;
     
-    float3 uvw = pos + 0.5;
-    float3 voxelPos = uvw * volumeDim;
-    int3 voxel = int3(floor(voxelPos));
+    float dist = tout - tin;
+    int maxSteps = int(dist / stepSize);
+    
+    float accum = 0.0;
 
-    int3 step = sign(ray.direction);
-    float3 tDelta = abs(1.0 / (ray.direction * volumeDim));
-
-    float3 distToNextBoundary;
-    distToNextBoundary.x = (step.x > 0) ? floor(voxelPos.x + 1.0) - voxelPos.x : voxelPos.x - floor(voxelPos.x);    
-    distToNextBoundary.y = (step.y > 0) ? floor(voxelPos.y + 1.0) - voxelPos.y : voxelPos.y - floor(voxelPos.y);
-    distToNextBoundary.z = (step.z > 0) ? floor(voxelPos.z + 1.0) - voxelPos.z : voxelPos.z - floor(voxelPos.z);
-
-    float3 tMax = t + (distToNextBoundary * tDelta);
-    float4 dst = float4(0, 0, 0, 0);
+    float3 dims = float3(width, height, depth);
 
     [loop]
-    while (t < tout)
+    for(int i = 0; i < maxSteps; i++)
     {
-        if (all(voxel >= 0) && all(voxel < int3(volumeDim)))
+        float3 uv = pos + 0.5;
+        if (any(uv < 0) || any(uv > 1)) break;
+        int3 voxelCoord = int3(uv * dims);
+        float alpha = TrailMap[voxelCoord]; 
+        alpha *= opacity; 
+        accum += alpha * (1.0 - accum);
+        if (accum >= 0.98) 
         {
-            // dst.rgb = float3(1.0, 1.0, 1.0);
-            // break;
-            float4 src = ColorMap[voxel];
-
-            float alpha = dot(TrailMap[voxel].xyz, float3(1.0,1.0,1.0) / float(numSpecies));
-            // alpha = alpha * opacity;
-            
-            // dst.rgb += src.rgb * alpha * (1.0 - dst.a);
-            // dst.a += alpha * (1.0 - dst.a);
-            if (alpha > 0.0) {
-                dst.rgb = float3(1.0, 1.0, 1.0);
-                break;
-            }
-
-            if (dst.a >= 0.99) break; // Early exit if opaque
+            accum = 1.0;
+            break; 
         }
-        if (tMax.x < tMax.y)
-        {
-            if (tMax.x < tMax.z)
-            {
-                voxel.x += step.x;
-                t = tMax.x;
-                tMax.x += tDelta.x;
-            }
-            else
-            {
-                voxel.z += step.z;
-                t = tMax.z;
-                tMax.z += tDelta.z;
-            }
-        }
-        else
-        {
-            if (tMax.y < tMax.z)
-            {
-                voxel.y += step.y;
-                t = tMax.y;
-                tMax.y += tDelta.y;
-            }
-            else
-            {
-                voxel.z += step.z;
-                t = tMax.z;
-                tMax.z += tDelta.z;
-            }
-        }
+        pos += stepVec;
     }
-
-    return dst.rgb;
+    return color.rgb * accum;
 }
 
 Ray CreateRay(float3 origin, float3 direction)
