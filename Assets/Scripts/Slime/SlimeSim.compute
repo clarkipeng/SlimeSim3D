@@ -29,11 +29,6 @@ struct Agent {
 RWStructuredBuffer<Agent> agents;
 
 // LCG Random
-// float NextFloat(inout uint state) {
-//     state = state * 747796405 + 2891336453;
-//     float result = ((state >> ((state >> 28) + 4)) ^ state) * 2.77555756e-17;
-//     return result;
-// }
 float NextFloat(inout uint state) 
 {
     state = state * 1664525u + 1013904223u;

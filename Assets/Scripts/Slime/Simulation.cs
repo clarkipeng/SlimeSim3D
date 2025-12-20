@@ -37,6 +37,10 @@ public class Simulation : MonoBehaviour
 	// CAMERA INFO
 	public Camera camera;
 
+	[Header("Display settings")]
+	public Color primaryColor = Color.green;
+	public Color secondaryColor = Color.blue;
+
 	public virtual void Start()
 	{
 		Init();
@@ -139,6 +143,19 @@ public class Simulation : MonoBehaviour
 			RunSimulation();
 		}
 	}
+	(RenderTexture source, RenderTexture destination) GetTrailMaps()
+	{
+		bool isEvenFrame = Time.frameCount % 2 == 0;
+
+		if (isEvenFrame)
+		{
+			return (trailMap, diffusedTrailMap);
+		}
+		else
+		{
+			return (diffusedTrailMap, trailMap);
+		}
+	}
 
 	void LateUpdate()
 	{
@@ -153,7 +170,10 @@ public class Simulation : MonoBehaviour
 		drawShader.SetInt("depth", settings.depth);
 
 		drawShader.SetFloat("opacity", opacity);
-		drawShader.SetVector("color", settings.speciesSetting.color);
+
+		drawShader.SetVector("frontColor", primaryColor);
+		drawShader.SetVector("backColor", secondaryColor);
+
 		drawShader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
 		drawShader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
 
@@ -175,19 +195,17 @@ public class Simulation : MonoBehaviour
 
 		// ComputeHelper.CopyRenderTexture(diffusedTrailMap, trailMap);
 
-		bool isEvenFrame = Time.frameCount % 2 == 0;
-		RenderTexture sourceTex = isEvenFrame ? trailMap : diffusedTrailMap;
-		RenderTexture destTex = isEvenFrame ? diffusedTrailMap : trailMap;
+		var maps = GetTrailMaps();
 
-		compute.SetTexture(diffuseMapKernel, "TrailMap", sourceTex);
-		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", destTex);
+		compute.SetTexture(diffuseMapKernel, "TrailMap", maps.source);
+		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", maps.destination);
 		ComputeHelper.Dispatch(compute, settings.width, settings.height, settings.depth, kernelIndex: diffuseMapKernel);
 
-		compute.SetTexture(updateKernel, "ReadTrailMap", sourceTex);
-		compute.SetTexture(updateKernel, "WriteTrailMap", destTex);
+		compute.SetTexture(updateKernel, "ReadTrailMap", maps.source);
+		compute.SetTexture(updateKernel, "WriteTrailMap", maps.destination);
 		ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
 
-		drawShader.SetTexture(drawKernel, "TrailMap", destTex);
+		drawShader.SetTexture(drawKernel, "TrailMap", maps.destination);
 	}
 
 	void OnDestroy()

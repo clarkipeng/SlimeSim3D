@@ -1,13 +1,16 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 
-// Texture3D<float> ColorMap;
 Texture3D<float> TrailMap;
+SamplerState samplerTrailMap;
 
 float4x4 cameraToWorld;
 float4x4 cameraInverseProjection;
 float opacity;
-float4 color;
+
+// float4 color;
+float3 frontColor = float3(1.0, 0.4, 0.1); // Bright Orange
+float3 backColor  = float3(0.1, 0.1, 1.0); // Deep Blue
 
 int width;
 int height;
@@ -37,6 +40,11 @@ bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax)
     return tmax >= max(tmin, 0.0f);
 }
 
+float3 GetDepthColor(float t)
+{
+    return lerp(frontColor, backColor, t);
+}
+
 float3 Trace(Ray ray)
 {
     float tin, tout;
@@ -51,21 +59,38 @@ float3 Trace(Ray ray)
     // float stepSize = 0.01f;
 
     float3 startPos = ray.origin + ray.direction * (tin + 1e-4);
-    float3 posVoxel = (startPos + 0.5f) * dims;
-    float3 stepVecVoxel = (ray.direction * stepSize) * dims;
+    float3 pos = (startPos + 0.5f);
+    float3 stepVec = (ray.direction * stepSize);
     int maxSteps = int((tout - tin) / stepSize);
     
-    float trans = 1.0f;
+    // float trans = 1.0f;
+
+    float3 accColor = 0.0;
+    float accAlpha = 0.0;
+    float t = 0;
 
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
-        float alpha = TrailMap[int3(posVoxel)] * opacity;
-        trans *= (1.0f - alpha);
-        if (trans < 0.02f) break;
-        posVoxel += stepVecVoxel;
+        if (any(pos < 0) || any(pos > 1)) break;
+        float density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
+
+        // if (density > 0.1)
+        // {
+        //     accColor = 1.0f;
+        //     break;
+        // }
+        float a = density * opacity; 
+        float3 col = GetDepthColor(pos.z);
+        accColor += col * a * (1.0 - accAlpha);
+        accAlpha += a * (1.0 - accAlpha);
+        
+        if (accAlpha >= 0.98) break;
+
+        // t += stepSize;
+        pos += stepVec;
     }
-    return color.rgb * (1.0f - trans);
+    return accColor;
 }
 
 Ray CreateCameraRay(float2 uv)
