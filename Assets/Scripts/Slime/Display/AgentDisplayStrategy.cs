@@ -4,6 +4,9 @@ using ComputeShaderUtility;
 [CreateAssetMenu(menuName = "Slime Settings/Display/DrawAgent")]
 public class AgentDisplayStrategy : DisplayStrategy
 {
+    [Header("Shader Parameters")]
+    public Color color = Color.green;
+
     public override void Dispatch(
         RenderTexture sourceTrailMap,
         RenderTexture destinationScreen,
@@ -26,10 +29,13 @@ public class AgentDisplayStrategy : DisplayStrategy
         Matrix4x4 vp = proj * view;
 
         shader.SetInt("resolution", settings.resolution);
+
         shader.SetTexture(kernel, "Result", destinationScreen);
         shader.SetBuffer(kernel, "agents", agentsBuffer);
         shader.SetInt("numAgents", settings.numAgents);
+
         shader.SetMatrix("viewProjection", vp);
+        shader.SetVector("color", color);
 
         ComputeHelper.Dispatch(shader, settings.numAgents, 1, 1, kernelIndex: kernel);
     }

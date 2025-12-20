@@ -78,10 +78,14 @@ void Update (uint3 id : SV_DispatchThreadID)
 	float rand = NextFloat(agent.rngState);
 
 	// Continue in same direction
-	if (weightForward > maxWeightRadial) {
+	if (weightForward >= maxWeightRadial) {
 	}
 	else if (weightForward < minWeightRadial || maxWeightRadial == minWeightRadial) {
-		float3 randomDir = (rand - 0.5) *  agentRight + (NextFloat(agent.rngState) - 0.5) * agentUp;
+		float r1 = NextFloat(agent.rngState);
+		float r2 = NextFloat(agent.rngState);
+		float r3 = NextFloat(agent.rngState);
+
+		float3 randomDir = (rand - r2) *  agentRight + (r3 - r1) * agentUp;
     	agent.direction += randomDir * turnSpeed;
 	}
 	else if (weightRight == maxWeightRadial) agent.direction += agentRight * turnSpeed * rand;
@@ -117,7 +121,13 @@ void Update (uint3 id : SV_DispatchThreadID)
         // randDir.y = (((r >> 10) & 0x3FF) / 1023.0f) - 0.5f;
         // randDir.z = (((r >> 20) & 0x3FF) / 1023.0f) - 0.5f;
 
-        float3 randDir = float3(NextFloat(agent.rngState), NextFloat(agent.rngState), NextFloat(agent.rngState)) - 0.5f;
+		float r1 = NextFloat(agent.rngState);
+		float r2 = NextFloat(agent.rngState);
+		float r3 = NextFloat(agent.rngState);
+		float r4 = NextFloat(agent.rngState);
+		float r5 = NextFloat(agent.rngState);
+		float r6 = NextFloat(agent.rngState);
+        float3 randDir = float3(r1-r4,r2-r5,r3-r5) - 0.5f;
 		// float3 randDir = float3(x, y, z);
 		if (outsideSphere && dot(offset, randDir) > 0.0f)
 		{

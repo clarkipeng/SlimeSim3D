@@ -4,12 +4,13 @@ using ComputeShaderUtility;
 using UnityEngine.UI;
 
 
-[CreateAssetMenu(menuName = "Slime Settings/Display/Gradient")]
-public class GradientDisplayStrategy : DisplayStrategy
+[CreateAssetMenu(menuName = "Slime Settings/Display/Density")]
+public class DensityDisplayStrategy : DisplayStrategy
 {
     [Header("Shader Parameters")]
-    public Color primaryColor = Color.green;
-    public Color secondaryColor = Color.blue;
+    public Color colorLow = Color.blue;
+    public Color colorMid = Color.red;
+    public Color colorHigh = Color.white;
 
     [Range(0.5f, 5)]
     public float alphaScale = 1.0f;
@@ -33,8 +34,9 @@ public class GradientDisplayStrategy : DisplayStrategy
         shader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
         shader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
 
-        shader.SetVector("frontColor", primaryColor);
-        shader.SetVector("backColor", secondaryColor);
+        shader.SetVector("colorLow", colorLow);
+        shader.SetVector("colorMid", colorMid);
+        shader.SetVector("colorHigh", colorHigh);
 
         shader.SetFloat("alphaScale", alphaScale);
         shader.SetFloat("alphaAmb", alphaAmb);

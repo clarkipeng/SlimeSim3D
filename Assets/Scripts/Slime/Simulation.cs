@@ -123,9 +123,12 @@ public class Simulation : MonoBehaviour
 			RunSimulation();
 		}
 	}
+
+	private int simFrame = 0;
 	(RenderTexture source, RenderTexture destination) GetTrailMaps()
 	{
-		bool isEvenFrame = Time.frameCount % 2 == 0;
+		bool isEvenFrame = simFrame % 2 == 0;
+		simFrame += 1;
 
 		if (isEvenFrame)
 		{

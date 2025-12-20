@@ -10,9 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f2e3a152f9d5c4635ad62c044b708c56, type: 3}
-  m_Name: GradientDisplay
+  m_Name: Gradient
   m_EditorClassIdentifier: 
   shader: {fileID: 7200000, guid: 6c33498edfd2642bb9f51605ad09591e, type: 3}
   kernelName: Render
-  primaryColor: {r: 0, g: 1, b: 0, a: 1}
-  secondaryColor: {r: 0, g: 0, b: 1, a: 1}
+  colorLow: {r: 0, g: 0, b: 1, a: 1}
+  colorMid: {r: 1, g: 0, b: 0, a: 1}
+  colorHigh: {r: 1, g: 1, b: 1, a: 1}
+  alphaScale: 1
+  alphaAmb: 0.00001

@@ -7,8 +7,7 @@ SamplerState samplerTrailMap;
 float4x4 cameraToWorld;
 float4x4 cameraInverseProjection;
 
-float3 frontColor;
-float3 backColor;
+float4 colorLow,colorMid,colorHigh;
 
 half alphaScale;
 half alphaAmb;
@@ -58,7 +57,9 @@ bool IntersectBounds(float3 ro, float3 rd, out float tmin, out float tmax)
 
 float3 GetColor(float t)
 {
-    return lerp(frontColor, backColor, min(1,max(0,t)));
+    // float t = saturate(density * 2.0); // Boost contrast
+    if (t < 0.5) return lerp(colorLow, colorMid, t * 2.0);
+    return lerp(colorMid, colorHigh, (t - 0.5) * 2.0);
 }
 
 float3 Trace(Ray ray)
@@ -89,10 +90,12 @@ float3 Trace(Ray ray)
         half density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
         density = pow(density, alphaScale);
 
+
         if (density > 0.001) 
         {
+            density = (1-alphaAmb) * density + alphaAmb;
             float radiusSq = dot(pos - 0.5, pos - 0.5) * 4;
-            float3 col = GetColor(radiusSq);
+            float3 col = GetColor(density);
             accColor += col * density * transmittance;
             transmittance *= (1.0 - density);
             if (transmittance < 0.01) break;
