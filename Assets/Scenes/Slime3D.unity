@@ -171,7 +171,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   compute: {fileID: 7200000, guid: a0aea66b8c503e748bb334583d5db67c, type: 3}
   drawShader: {fileID: 7200000, guid: 6c33498edfd2642bb9f51605ad09591e, type: 3}
-  settings: {fileID: 11400000, guid: 17e98c20846d94d1db264dff24960cba, type: 2}
+  settings: {fileID: 11400000, guid: ff3349dcd8ced470ca27067eedfff67e, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
@@ -384,9 +384,10 @@ MonoBehaviour:
   target: {fileID: 1248530623}
   rotateSpeed: 5
   zoomSpeed: 2
-  minDistance: 1
-  maxDistance: 100
-  distance: 10
+  minRadius: 1
+  maxRadius: 100
+  smoothSpeed: 10
+  radius: 10
   yaw: 0
   pitch: 0
   gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}

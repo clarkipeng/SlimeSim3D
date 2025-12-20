@@ -1,0 +1,39 @@
+﻿#pragma kernel DrawAgent
+
+int resolution;
+uint numAgents;
+RWTexture2D<float4> Result;
+
+struct Agent {
+    float3 position;
+    float pad0;
+    float3 direction;
+    uint rngState;
+};
+RWStructuredBuffer<Agent> agents;
+
+float4x4 viewProjection;
+
+[numthreads(256,1,1)]
+void DrawAgent (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float3 worldPos = (agent.position / (float)resolution) - 0.5f;
+
+    float4 clipPos = mul(viewProjection, float4(worldPos, 1.0f));
+
+    if (clipPos.w <= 0) return; 
+    float2 ndc = clipPos.xy / clipPos.w;
+    float2 uv = ndc * 0.5f + 0.5f;
+
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+    int2 pixel = int2(uv.x * w, uv.y * h);
+    if (pixel.x >= 0 && pixel.x < (int)w && pixel.y >= 0 && pixel.y < (int)h)
+    {
+        Result[pixel] = float4(1, 1, 1, 1);
+    }
+}

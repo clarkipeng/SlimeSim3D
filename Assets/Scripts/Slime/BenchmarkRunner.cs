@@ -21,7 +21,7 @@ public class BenchmarkRunner : MonoBehaviour
     public float startRadius = 10f;
     public float endRadius = 1f;
 
-    private float oldYaw, oldPitch, oldDist;
+    private float oldYaw, oldPitch, oldRadius;
     private SlimeSettings originalSettings;
 
     void Start()
@@ -50,7 +50,7 @@ public class BenchmarkRunner : MonoBehaviour
         originalSettings = simulation.settings;
         oldYaw = orbitCamera.yaw;
         oldPitch = orbitCamera.pitch;
-        oldDist = orbitCamera.distance;
+        oldRadius = orbitCamera.radius;
 
         int oldVSync = QualitySettings.vSyncCount;
         Application.targetFrameRate = -1;
@@ -61,9 +61,9 @@ public class BenchmarkRunner : MonoBehaviour
 
         if (orbitCamera != null)
         {
-            orbitCamera.yaw = startAngle;
-            orbitCamera.pitch = startPitch;
-            orbitCamera.distance = startRadius;
+            orbitCamera.setYaw(startAngle);
+            orbitCamera.setPitch(startPitch);
+            orbitCamera.setRadius(startRadius);
         }
 
         for (int i = 0; i < warmupFrames; i++) yield return new WaitForEndOfFrame();
@@ -78,7 +78,7 @@ public class BenchmarkRunner : MonoBehaviour
             if (orbitCamera != null)
             {
                 orbitCamera.yaw = Mathf.Lerp(startAngle, endAngle, t);
-                orbitCamera.distance = Mathf.Lerp(startRadius, endRadius, t);
+                orbitCamera.radius = Mathf.Lerp(startRadius, endRadius, t);
             }
 
             yield return new WaitForEndOfFrame();
@@ -91,9 +91,10 @@ public class BenchmarkRunner : MonoBehaviour
 
         simulation.settings = originalSettings;
         simulation.Init();
-        orbitCamera.yaw = oldYaw;
-        orbitCamera.pitch = oldPitch;
-        orbitCamera.distance = oldDist;
+
+        orbitCamera.setYaw(oldYaw);
+        orbitCamera.setPitch(oldPitch);
+        orbitCamera.setRadius(oldRadius);
 
         QualitySettings.vSyncCount = oldVSync;
     }

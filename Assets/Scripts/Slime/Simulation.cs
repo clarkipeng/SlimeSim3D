@@ -12,8 +12,6 @@ public class Simulation : MonoBehaviour
 	int drawKernel;
 
 	public ComputeShader compute;
-	// public ComputeShader drawAgentsCS;
-	public ComputeShader drawShader;
 
 	public SlimeSettings settings;
 
@@ -52,14 +50,10 @@ public class Simulation : MonoBehaviour
 
 		updateKernel = compute.FindKernel("Update");
 		diffuseMapKernel = compute.FindKernel("Diffuse");
-		drawKernel = drawShader.FindKernel(displayStrategy.kernelName);
 
 		compute.SetTexture(updateKernel, "TrailMap", trailMap);
 		compute.SetTexture(diffuseMapKernel, "TrailMap", trailMap);
 		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", diffusedTrailMap);
-
-		drawShader.SetTexture(drawKernel, "TrailMap", trailMap);
-		drawShader.SetTexture(drawKernel, "Result", displayTexture);
 
 		// Create agents with initial positions and angles
 		Agent[] agents = new Agent[settings.numAgents];
@@ -148,13 +142,13 @@ public class Simulation : MonoBehaviour
 		if (displayTexture.width != Screen.width || displayTexture.height != Screen.height)
 		{
 			ComputeHelper.CreateRenderTexture(ref displayTexture, Screen.width, Screen.height, filterMode, format);
-			drawShader.SetTexture(drawKernel, "Result", displayTexture);
 			outputImage.texture = displayTexture;
 		}
 		displayStrategy.Dispatch(
 			GetTrailMaps().destination,
 			displayTexture,
-			settings.resolution,
+			agentBuffer,
+			settings,
 			camera
 		);
 	}

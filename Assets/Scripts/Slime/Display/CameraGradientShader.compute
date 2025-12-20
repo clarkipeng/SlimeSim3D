@@ -1,7 +1,7 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel Render
 
-Texture3D<float> TrailMap;
+Texture3D<half> TrailMap;
 SamplerState samplerTrailMap;
 
 float4x4 cameraToWorld;
@@ -39,7 +39,7 @@ bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax)
 
 float3 GetDepthColor(float t)
 {
-    return lerp(frontColor, backColor, t);
+    return lerp(frontColor, backColor, min(1,max(0,t)));
 }
 
 float3 Trace(Ray ray)
@@ -52,7 +52,7 @@ float3 Trace(Ray ray)
     if (tin >= tout) return float3(0.0f,0.0f,0.0f);
 
     float3 dims = float3(resolution, resolution, resolution);
-    float stepSize = 0.5 / resolution;
+    float stepSize = 1.0 / resolution;
     // float stepSize = 0.01f;
 
     float3 startPos = ray.origin + ray.direction * (tin + 1e-4);
@@ -60,24 +60,23 @@ float3 Trace(Ray ray)
     float3 stepVec = (ray.direction * stepSize);
     int maxSteps = int((tout - tin) / stepSize);
     
-    // float trans = 1.0f;
-
     float3 accColor = 0.0;
-    float accAlpha = 0.0;
-    float t = 0;
+    float transmittance = 1.0;
 
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
         if (any(pos < 0) || any(pos > 1)) break;
-        float density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
+        half density = TrailMap.SampleLevel(samplerTrailMap, pos, 0).r;
 
-        float a = density; 
-        float3 col = GetDepthColor(pos.z);
-        accColor += col * a * (1.0 - accAlpha);
-        accAlpha += a * (1.0 - accAlpha);
-        
-        if (accAlpha >= 0.98) break;
+        if (density > 0.001) 
+        {
+            float radiusSq = dot(pos - 0.5, pos - 0.5) * 4;
+            float3 col = GetDepthColor(radiusSq);
+            accColor += col * density * transmittance;
+            transmittance *= (1.0 - density);
+            if (transmittance < 0.01) break;
+        }
 
         pos += stepVec;
     }

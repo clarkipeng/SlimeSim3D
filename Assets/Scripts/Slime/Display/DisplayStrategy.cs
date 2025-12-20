@@ -10,7 +10,8 @@ public abstract class DisplayStrategy : ScriptableObject
     public abstract void Dispatch(
         RenderTexture sourceTrailMap,
         RenderTexture destinationScreen,
-        int resolution,
+        ComputeBuffer agentsBuffer,
+        SlimeSettings settings,
         Camera camera
     );
 }

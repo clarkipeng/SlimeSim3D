@@ -10,14 +10,15 @@ public class DefaultDisplayStrategy : DisplayStrategy
     public override void Dispatch(
         RenderTexture sourceTrailMap,
         RenderTexture destinationScreen,
-        int resolution,
+        ComputeBuffer agentsBuffer,
+        SlimeSettings settings,
         Camera camera
     )
     {
         if (shader == null) return;
         int kernel = shader.FindKernel(kernelName);
 
-        shader.SetInt("resolution", resolution);
+        shader.SetInt("resolution", settings.resolution);
         shader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
         shader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
 

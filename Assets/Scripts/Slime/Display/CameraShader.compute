@@ -2,7 +2,7 @@
 #pragma kernel Render
 
 // Texture3D<float> ColorMap;
-Texture3D<float> TrailMap;
+Texture3D<half> TrailMap;
 
 float4x4 cameraToWorld;
 float4x4 cameraInverseProjection;
@@ -52,17 +52,17 @@ float3 Trace(Ray ray)
     float3 stepVecVoxel = (ray.direction * stepSize) * dims;
     int maxSteps = int((tout - tin) / stepSize);
     
-    float trans = 1.0f;
+    half trans = 1.0f;
 
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
-        float alpha = TrailMap[int3(posVoxel)];
-        trans *= (1.0f - alpha);
-        if (trans < 0.02f) break;
+        half alpha = TrailMap[int3(posVoxel)];
+        trans *= (1.0h - alpha);
+        if (trans < 0.02h) break;
         posVoxel += stepVecVoxel;
     }
-    return color.rgb * (1.0f - trans);
+    return color.rgb * (1.0h - trans);
 }
 
 Ray CreateCameraRay(float2 uv)

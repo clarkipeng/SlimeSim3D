@@ -31,14 +31,23 @@ struct Agent {
 RWStructuredBuffer<Agent> agents;
 
 // LCG Random
-float NextFloat(inout uint state) 
+float NextFloat(inout uint state)
 {
-    state = state * 1664525u + 1013904223u;
-    return float(state) * (1.0 / 4294967296.0);
+	state += time * 100000;
+    state ^= 2747636419u;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    return state / 4294967295.0;
 }
 
 half sense(Agent agent, float3 sensorDir) {
     float3 sensorPos = agent.position + sensorDir * sensorOffsetDst;
+	if (any(sensorPos < 0) || any(sensorPos >= resolution)) {
+        return 0;
+    }
     float3 uv = (sensorPos + 0.5) * invSize;
     return ReadTrailMap.SampleLevel(samplerReadTrailMap, uv, 0);
 }
@@ -89,20 +98,32 @@ void Update (uint3 id : SV_DispatchThreadID)
     bool outsideSphere = distSq > boundaryRadius * boundaryRadius;
     if (outsideSphere)
     {
-        newPos = center + offset * (boundaryRadius * rsqrt(distSq));
+        newPos = center + offset * rsqrt(distSq) * (boundaryRadius - 0.01f);
+		newPos += lerp(0.5f, -0.5f, step(center, newPos)); // round towards center
     }
     bool outsideBox = any(newPos < 0) || any(newPos >= resolution);
     if (outsideBox) 
     {
-        newPos = clamp(newPos, 0.01f, resolution - 0.01f);
+        newPos = clamp(newPos, 0.0, resolution - 1);
     }
     if (outsideSphere || outsideBox)
     {
-        float3 randDir;
-        randDir.x = NextFloat(agent.rngState);
-        randDir.y = NextFloat(agent.rngState);
-        randDir.z = NextFloat(agent.rngState);
-        agent.direction = normalize(randDir - 0.5f);
+		// uint r = agent.rngState; 
+        // r ^= r << 13; r ^= r >> 17; r ^= r << 5; 
+        // agent.rngState = r;
+
+        // float3 randDir;
+        // randDir.x = ((r & 0x3FF) / 1023.0f) - 0.5f;
+        // randDir.y = (((r >> 10) & 0x3FF) / 1023.0f) - 0.5f;
+        // randDir.z = (((r >> 20) & 0x3FF) / 1023.0f) - 0.5f;
+
+        float3 randDir = float3(NextFloat(agent.rngState), NextFloat(agent.rngState), NextFloat(agent.rngState)) - 0.5f;
+		// float3 randDir = float3(x, y, z);
+		if (outsideSphere && dot(offset, randDir) > 0.0f)
+		{
+			randDir = -randDir;
+		}
+        agent.direction = normalize(randDir);
     }
 
 	WriteTrailMap[int3(newPos)] += trailWeight;
@@ -118,23 +139,36 @@ half decayFactor;
 
 Texture3D<half> TrailMap;
 SamplerState samplerTrailMap;
-RWTexture3D<float> DiffusedTrailMap;
+RWTexture3D<float4> DiffusedTrailMap;
 
 [numthreads(8,8,4)]
 void Diffuse (uint3 id : SV_DispatchThreadID)
 {
 	if (any(id >= uint3(resolution, resolution, resolution))) return;
 
-	float3 uv = (id + 0.5f) * invSize;
+	// float3 uv = (id + 0.5f) * invSize;
 
-	half sum = TrailMap.SampleLevel(samplerTrailMap, uv, 0);
+	// half sum = TrailMap.SampleLevel(samplerTrailMap, uv, 0);
 
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3(-1, 0, 0));
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 1, 0, 0));
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0,-1, 0));
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 1, 0));
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0,-1));
-    sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0, 1));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3(-1, 0, 0));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 1, 0, 0));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0,-1, 0));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 1, 0));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0,-1));
+    // sum += TrailMap.SampleLevel(samplerTrailMap, uv, 0, int3( 0, 0, 1));
+
+	int3 pos = int3(id);
+	half sum = TrailMap.Load(int4(pos, 0));
+
+	sum += TrailMap.Load(int4(max(0, pos + int3(-1, 0, 0)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 1, 0, 0)), 0));
+    
+    sum += TrailMap.Load(int4(max(0, pos + int3( 0,-1, 0)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 0, 1, 0)), 0));
+    
+    sum += TrailMap.Load(int4(max(0, pos + int3( 0, 0,-1)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 0, 0, 1)), 0));
+	
 
 	half original = TrailMap[id];
 

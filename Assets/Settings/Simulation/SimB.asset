@@ -10,18 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2665318e53759e74db7a2d8238331945, type: 3}
-  m_Name: SimA
+  m_Name: SimB
   m_EditorClassIdentifier: 
   stepsPerFrame: 1
   resolution: 300
   boundaryRadius: 150
-  numAgents: 250000
+  numAgents: 100000
   spawnMode: 3
-  trailWeight: 5
-  decayRate: 0.2
-  diffuseRate: 3
+  trailWeight: 3
+  decayRate: 0.1
+  diffuseRate: 10
   speciesSetting:
-    moveSpeed: 4
+    moveSpeed: 8
     turnSpeed: 30
     sensorAngleSpacing: 30
-    sensorOffsetDst: 8
+    sensorOffsetDst: 4

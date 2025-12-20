@@ -7,13 +7,19 @@ public class OrbitCamera : MonoBehaviour
     [Header("Settings")]
     public float rotateSpeed = 5.0f;
     public float zoomSpeed = 2.0f;
-    public float minDistance = 1.0f;
-    public float maxDistance = 100.0f;
+    public float minRadius = 1.0f;
+    public float maxRadius = 100.0f;
+
+    [Range(1f, 20f)]
+    public float smoothSpeed = 10f;
 
     [Header("Current State")]
-    public float distance = 10.0f;
-    public float yaw = 0f;   // Previously _currentYaw
-    public float pitch = 0f; // Previously _currentPitch
+    public float radius = 10.0f;
+    public float yaw = 0f;
+    public float pitch = 0f;
+    private float targetRadius;
+    private float targetYaw;
+    private float targetPitch;
 
     [SerializeField]
     public Color gizmoColor = Color.cyan;
@@ -24,9 +30,13 @@ public class OrbitCamera : MonoBehaviour
         if (target != null)
         {
             Vector3 angles = transform.eulerAngles;
-            yaw = angles.y;
-            pitch = angles.x;
-            distance = Vector3.Distance(transform.position, target.position);
+            yaw = targetYaw = angles.y;
+            pitch = targetPitch = angles.x;
+
+
+            if (pitch > 180) pitch -= 360;
+
+            radius = targetRadius = Vector3.Distance(transform.position, target.position);
         }
     }
 
@@ -37,20 +47,26 @@ public class OrbitCamera : MonoBehaviour
         // Mouse Input modifies the public attributes directly
         if (Input.GetMouseButton(0))
         {
-            yaw += Input.GetAxis("Mouse X") * rotateSpeed;
-            pitch -= Input.GetAxis("Mouse Y") * rotateSpeed;
+            targetYaw += Input.GetAxis("Mouse X") * rotateSpeed;
+            targetPitch -= Input.GetAxis("Mouse Y") * rotateSpeed;
+
+            targetPitch = Mathf.Clamp(targetPitch, -89f, 89f);
         }
 
         float scrollDelta = Input.GetAxis("Mouse ScrollWheel");
-        distance -= scrollDelta * zoomSpeed;
-        distance = Mathf.Clamp(distance, minDistance, maxDistance);
+        targetRadius -= scrollDelta * zoomSpeed;
+        targetRadius = Mathf.Clamp(targetRadius, minRadius, maxRadius);
 
-        // Apply the attributes to the Transform
+        float lerpFactor = Time.deltaTime * smoothSpeed;
+        yaw = Mathf.Lerp(yaw, targetYaw, lerpFactor);
+        pitch = Mathf.Lerp(pitch, targetPitch, lerpFactor);
+        radius = Mathf.Lerp(radius, targetRadius, lerpFactor);
+
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
-        Vector3 positionOffset = rotation * new Vector3(0, 0, -distance);
+        Vector3 positionOffset = rotation * new Vector3(0, 0, -radius);
 
         transform.position = target.position + positionOffset;
-        transform.LookAt(target.position);
+        transform.rotation = rotation;
     }
 
     void OnDrawGizmos()
@@ -58,8 +74,22 @@ public class OrbitCamera : MonoBehaviour
         if (target != null)
         {
             Gizmos.color = gizmoColor;
-            Gizmos.DrawWireSphere(target.position, distance);
+            Gizmos.DrawWireSphere(target.position, radius);
             Gizmos.DrawLine(target.position, transform.position);
         }
+    }
+
+
+    public void setYaw(float x)
+    {
+        yaw = targetYaw = x;
+    }
+    public void setPitch(float x)
+    {
+        pitch = targetPitch = x;
+    }
+    public void setRadius(float x)
+    {
+        radius = targetRadius = x;
     }
 }
