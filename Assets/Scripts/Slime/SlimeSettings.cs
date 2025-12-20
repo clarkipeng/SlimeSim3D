@@ -2,16 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu()]
+[CreateAssetMenu(menuName = "Slime Settings/Simulation")]
 public class SlimeSettings : ScriptableObject
 {
 	[Header("Simulation Settings")]
 	[Min(1)] public int stepsPerFrame = 1;
-
-	public int width = 1280;
-	public int height = 720;
-	public int depth = 100;
-
+	public int resolution = 300;
+	public int boundaryRadius = 150;
 	public int numAgents = 100;
 	public Simulation.SpawnMode spawnMode;
 
@@ -32,9 +29,5 @@ public class SlimeSettings : ScriptableObject
 		[Header("Sensor Settings")]
 		public float sensorAngleSpacing;
 		public float sensorOffsetDst;
-		[Min(1)] public int sensorSize;
-
-		[Header("Display settings")]
-		public Color color;
 	}
 }

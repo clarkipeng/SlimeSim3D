@@ -22,9 +22,8 @@ public class Simulation : MonoBehaviour
 	public GraphicsFormat format = ComputeHelper.defaultGraphicsFormat;
 	public GraphicsFormat volumeFormat = GraphicsFormat.R8_UNorm;
 
-	[Header("Render Settings")]
-	[Range(0, 1)]
-	public float opacity = 1.0f;
+	[Header("Display Strategy")]
+	public DisplayStrategy displayStrategy;
 
 	[SerializeField, HideInInspector] protected RenderTexture trailMap;
 	[SerializeField, HideInInspector] protected RenderTexture diffusedTrailMap;
@@ -37,10 +36,6 @@ public class Simulation : MonoBehaviour
 	// CAMERA INFO
 	public Camera camera;
 
-	[Header("Display settings")]
-	public Color primaryColor = Color.green;
-	public Color secondaryColor = Color.blue;
-
 	public virtual void Start()
 	{
 		Init();
@@ -50,14 +45,14 @@ public class Simulation : MonoBehaviour
 
 	public void Init()
 	{
-		ComputeHelper.CreateRenderTexture(ref trailMap, settings.width, settings.height, settings.depth, filterMode, volumeFormat);
-		ComputeHelper.CreateRenderTexture(ref diffusedTrailMap, settings.width, settings.height, settings.depth, filterMode, volumeFormat);
+		ComputeHelper.CreateRenderTexture(ref trailMap, settings.resolution, settings.resolution, settings.resolution, filterMode, volumeFormat);
+		ComputeHelper.CreateRenderTexture(ref diffusedTrailMap, settings.resolution, settings.resolution, settings.resolution, filterMode, volumeFormat);
 
-		ComputeHelper.CreateRenderTexture(ref displayTexture, settings.width, settings.height, filterMode, format);
+		ComputeHelper.CreateRenderTexture(ref displayTexture, Screen.width, Screen.height, filterMode, format);
 
 		updateKernel = compute.FindKernel("Update");
 		diffuseMapKernel = compute.FindKernel("Diffuse");
-		drawKernel = drawShader.FindKernel("CSMain");
+		drawKernel = drawShader.FindKernel(displayStrategy.kernelName);
 
 		compute.SetTexture(updateKernel, "TrailMap", trailMap);
 		compute.SetTexture(diffuseMapKernel, "TrailMap", trailMap);
@@ -70,7 +65,7 @@ public class Simulation : MonoBehaviour
 		Agent[] agents = new Agent[settings.numAgents];
 		for (int i = 0; i < agents.Length; i++)
 		{
-			Vector3 centre = new Vector3(settings.width / 2, settings.height / 2, settings.depth / 2);
+			Vector3 centre = new Vector3(settings.resolution / 2, settings.resolution / 2, settings.resolution / 2);
 			Vector3 startPos = Vector3.zero;
 
 			Vector3 randomDirection = Random.onUnitSphere;
@@ -83,17 +78,17 @@ public class Simulation : MonoBehaviour
 			}
 			else if (settings.spawnMode == SpawnMode.Random)
 			{
-				startPos = new Vector3(Random.Range(0, settings.width), Random.Range(0, settings.height), Random.Range(0, settings.depth));
+				startPos = new Vector3(Random.Range(0, settings.resolution), Random.Range(0, settings.resolution), Random.Range(0, settings.resolution));
 				direction = randomDirection;
 			}
 			else if (settings.spawnMode == SpawnMode.InwardCircle)
 			{
-				startPos = centre + Random.insideUnitSphere * Mathf.Min(settings.height, settings.width, settings.depth) * 0.5f;
+				startPos = centre + Random.onUnitSphere * settings.boundaryRadius * 0.8f;
 				direction = (centre - startPos).normalized;
 			}
 			else if (settings.spawnMode == SpawnMode.RandomCircle)
 			{
-				startPos = centre + Random.insideUnitSphere * Mathf.Min(settings.height, settings.width, settings.depth) * 0.15f;
+				startPos = centre + Random.insideUnitSphere * settings.resolution * 0.15f;
 				direction = randomDirection;
 			}
 
@@ -103,12 +98,9 @@ public class Simulation : MonoBehaviour
 		ComputeHelper.CreateAndSetBuffer<Agent>(ref agentBuffer, agents, compute, "agents", updateKernel);
 
 		compute.SetInt("numAgents", settings.numAgents);
-		// drawAgentsCS.SetBuffer(0, "agents", agentBuffer);
-		// drawAgentsCS.SetInt("numAgents", settings.numAgents);
 
-		compute.SetInt("width", settings.width);
-		compute.SetInt("height", settings.height);
-		compute.SetInt("depth", settings.depth);
+		compute.SetInt("resolution", settings.resolution);
+		compute.SetInt("boundaryRadius", settings.boundaryRadius);
 	}
 
 
@@ -120,19 +112,13 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("turnSpeed", s.turnSpeed / 180f);
 		compute.SetFloat("sensorOffsetDst", s.sensorOffsetDst);
 
-		// assumed sensorSize=1 -> compiled loop unrolling
-		// compute.SetInt("sensorSize", s.sensorSize);
-
-		// Precompute trig once per frame
 		float angleRad = s.sensorAngleSpacing * Mathf.Deg2Rad;
 		compute.SetFloat("cosAngle", Mathf.Cos(angleRad));
 		compute.SetFloat("sinAngle", Mathf.Sin(angleRad));
 
-		compute.SetVector("invSize", new Vector3(1.0f / settings.width, 1.0f / settings.height, 1.0f / settings.depth));
+		compute.SetVector("invSize", new Vector3(1.0f / settings.resolution, 1.0f / settings.resolution, 1.0f / settings.resolution));
 
 		compute.SetFloat("trailWeight", settings.trailWeight);
-		// compute.SetFloat("decayRate", settings.decayRate);
-		// compute.SetFloat("diffuseRate", settings.diffuseRate);
 	}
 
 	void FixedUpdate()
@@ -165,19 +151,12 @@ public class Simulation : MonoBehaviour
 			drawShader.SetTexture(drawKernel, "Result", displayTexture);
 			outputImage.texture = displayTexture;
 		}
-		drawShader.SetInt("width", settings.width);
-		drawShader.SetInt("height", settings.height);
-		drawShader.SetInt("depth", settings.depth);
-
-		drawShader.SetFloat("opacity", opacity);
-
-		drawShader.SetVector("frontColor", primaryColor);
-		drawShader.SetVector("backColor", secondaryColor);
-
-		drawShader.SetMatrix("cameraToWorld", camera.cameraToWorldMatrix);
-		drawShader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
-
-		ComputeHelper.Dispatch(drawShader, Screen.width, Screen.height, 1, kernelIndex: drawKernel);
+		displayStrategy.Dispatch(
+			GetTrailMaps().destination,
+			displayTexture,
+			settings.resolution,
+			camera
+		);
 	}
 
 	void RunSimulation()
@@ -190,22 +169,15 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("decayFactor", settings.decayRate * dt);
 		compute.SetFloat("trailWeight", settings.trailWeight);
 
-		// ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
-		// ComputeHelper.Dispatch(compute, settings.width, settings.height, settings.depth, kernelIndex: diffuseMapKernel);
-
-		// ComputeHelper.CopyRenderTexture(diffusedTrailMap, trailMap);
-
 		var maps = GetTrailMaps();
 
 		compute.SetTexture(diffuseMapKernel, "TrailMap", maps.source);
 		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", maps.destination);
-		ComputeHelper.Dispatch(compute, settings.width, settings.height, settings.depth, kernelIndex: diffuseMapKernel);
+		ComputeHelper.Dispatch(compute, settings.resolution, settings.resolution, settings.resolution, kernelIndex: diffuseMapKernel);
 
 		compute.SetTexture(updateKernel, "ReadTrailMap", maps.source);
 		compute.SetTexture(updateKernel, "WriteTrailMap", maps.destination);
 		ComputeHelper.Dispatch(compute, settings.numAgents, 1, 1, kernelIndex: updateKernel);
-
-		drawShader.SetTexture(drawKernel, "TrailMap", maps.destination);
 	}
 
 	void OnDestroy()

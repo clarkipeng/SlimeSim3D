@@ -10,21 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2665318e53759e74db7a2d8238331945, type: 3}
-  m_Name: A
+  m_Name: SimBench
   m_EditorClassIdentifier: 
-  stepsPerFrame: 1
-  width: 500
-  height: 500
-  depth: 500
+  stepsPerFrame: 10
+  res: 300
+  boundaryRadius: 301
   numAgents: 250000
   spawnMode: 2
   trailWeight: 5
   decayRate: 0.2
   diffuseRate: 3
   speciesSetting:
-    moveSpeed: 4
+    moveSpeed: 10
     turnSpeed: 30
     sensorAngleSpacing: 30
     sensorOffsetDst: 8
-    sensorSize: 1
-    color: {r: 1, g: 1, b: 1, a: 0}

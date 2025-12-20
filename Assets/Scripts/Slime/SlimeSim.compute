@@ -12,7 +12,9 @@ half cosAngle;
 half sinAngle;
 
 uint numAgents;
-int width, height, depth;
+
+int resolution;
+int boundaryRadius;
 
 half trailWeight;
 
@@ -73,22 +75,36 @@ void Update (uint3 id : SV_DispatchThreadID)
 		float3 randomDir = (rand - 0.5) *  agentRight + (NextFloat(agent.rngState) - 0.5) * agentUp;
     	agent.direction += randomDir * turnSpeed;
 	}
-	else if (weightRight==maxWeightRadial ) agent.direction += agentRight * turnSpeed * rand;
-	else if (weightLeft == maxWeightRadial) agent.direction -= agentRight * turnSpeed * rand;
-	else if (weightUp == maxWeightRadial  )	agent.direction += agentUp * turnSpeed * rand;
-	else if (weightDown == maxWeightRadial) agent.direction -= agentUp * turnSpeed * rand;
+	else if (weightRight == maxWeightRadial) agent.direction += agentRight * turnSpeed * rand;
+	else if (weightLeft  == maxWeightRadial) agent.direction -= agentRight * turnSpeed * rand;
+	else if (weightUp    == maxWeightRadial) agent.direction += agentUp * turnSpeed * rand;
+	else if (weightDown  == maxWeightRadial) agent.direction -= agentUp * turnSpeed * rand;
 
 	agent.direction = normalize(agent.direction);
 	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
 
-	// Clamp position to map boundaries, and pick new random move dir if hit boundary
-	if (newPos.x < 0 || newPos.x >= width || newPos.y < 0 || newPos.y >= height || newPos.z < 0 || newPos.z >= depth) {
-		newPos = min(float3(width, height, depth), max(0.0f, newPos));
-		float r1 = NextFloat(agent.rngState); 
-        float r2 = NextFloat(agent.rngState);
-        float r3 = NextFloat(agent.rngState);
-		agent.direction = normalize(float3(r1 - 0.5, r2 - 0.5, r3 - 0.5));
-	}
+	float3 center = float3(resolution, resolution, resolution) * 0.5;
+    float3 offset = newPos - center;
+    float distSq = dot(offset, offset);
+    bool outsideSphere = distSq > boundaryRadius * boundaryRadius;
+    if (outsideSphere)
+    {
+        newPos = center + offset * (boundaryRadius * rsqrt(distSq));
+    }
+    bool outsideBox = any(newPos < 0) || any(newPos >= resolution);
+    if (outsideBox) 
+    {
+        newPos = clamp(newPos, 0.01f, resolution - 0.01f);
+    }
+    if (outsideSphere || outsideBox)
+    {
+        float3 randDir;
+        randDir.x = NextFloat(agent.rngState);
+        randDir.y = NextFloat(agent.rngState);
+        randDir.z = NextFloat(agent.rngState);
+        agent.direction = normalize(randDir - 0.5f);
+    }
+
 	WriteTrailMap[int3(newPos)] += trailWeight;
 	
 	agent.position = newPos;
@@ -107,7 +123,7 @@ RWTexture3D<float> DiffusedTrailMap;
 [numthreads(8,8,4)]
 void Diffuse (uint3 id : SV_DispatchThreadID)
 {
-	if (any(id >= uint3(width, height, depth))) return;
+	if (any(id >= uint3(resolution, resolution, resolution))) return;
 
 	float3 uv = (id + 0.5f) * invSize;
 

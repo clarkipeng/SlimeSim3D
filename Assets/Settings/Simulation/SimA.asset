@@ -10,21 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2665318e53759e74db7a2d8238331945, type: 3}
-  m_Name: BenchmarkSetting
+  m_Name: SimA
   m_EditorClassIdentifier: 
-  stepsPerFrame: 10
-  width: 300
-  height: 300
-  depth: 300
+  stepsPerFrame: 1
+  res: 300
+  boundaryRadius: 150
   numAgents: 250000
   spawnMode: 2
   trailWeight: 5
   decayRate: 0.2
   diffuseRate: 3
   speciesSetting:
-    moveSpeed: 10
+    moveSpeed: 4
     turnSpeed: 30
     sensorAngleSpacing: 30
     sensorOffsetDst: 8
-    sensorSize: 1
-    color: {r: 0, g: 1, b: 0.19657993, a: 0}
