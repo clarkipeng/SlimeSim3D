@@ -1,14 +1,18 @@
-// Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel Render
 
-// Texture3D<float> ColorMap;
 Texture3D<half> TrailMap;
+SamplerState samplerTrailMap;
 
 float4x4 cameraToWorld;
 float4x4 cameraInverseProjection;
+
 float4 color;
 
+half alphaScale;
+half alphaAmb;
+
 int resolution;
+int boundaryRadius;
 
 RWTexture2D<float4> Result;
 
@@ -18,51 +22,93 @@ struct Ray
     float3 direction;
 };
 
-bool IntersectBox(float3 ro, float3 rd, out float tmin, out float tmax)
+bool IntersectBounds(float3 ro, float3 rd, out float tmin, out float tmax)
 {
     float3 invDir = 1.0f / rd;
-
     float3 t0 = (-0.5f - ro) * invDir;
-    float3 t1 = (0.5f - ro) * invDir;
+    float3 t1 = ( 0.5f - ro) * invDir;
 
     float3 tmin3 = min(t0, t1);
     float3 tmax3 = max(t0, t1);
 
-    tmin = max(max(tmin3.x, tmin3.y), tmin3.z);
-    tmax  = min(min(tmax3.x, tmax3.y), tmax3.z);
+    float boxTmin = max(max(tmin3.x, tmin3.y), tmin3.z);
+    float boxTmax = min(min(tmax3.x, tmax3.y), tmax3.z);
+
+    if (boxTmax < max(boxTmin, 0.0f)) return false;
+
+    float radius = ((float)boundaryRadius)/resolution;
+    
+    float b = dot(ro, rd);
+    float c = dot(ro, ro) - (radius * radius);
+    float h = b*b - c;
+
+    if (h < 0.0f) return false;
+
+    float sqrtH = sqrt(h);
+    float sphereTmin = -b - sqrtH;
+    float sphereTmax = -b + sqrtH;
+
+    tmin = max(boxTmin, sphereTmin);
+    tmax = min(boxTmax, sphereTmax);
 
     return tmax >= max(tmin, 0.0f);
 }
 
-float3 Trace(Ray ray)
+
+float randJitter(float2 co) {
+    return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+
+float3 GetColor()
+{
+    return color;
+}
+
+float3 Trace(Ray ray, float2 uv)
 {
     float tin, tout;
-    if (!IntersectBox(ray.origin, ray.direction, tin, tout))
+    if (!IntersectBounds(ray.origin, ray.direction, tin, tout))
         return float3(0,0,0);
 
     tin = max(0.0f, tin);
     if (tin >= tout) return float3(0.0f,0.0f,0.0f);
 
     float3 dims = float3(resolution, resolution, resolution);
-    float stepSize = 0.5 / resolution;
-    // float stepSize = 0.01f;
+    float stepSize = 1.0 / resolution;
 
-    float3 startPos = ray.origin + ray.direction * (tin + 1e-4);
-    float3 posVoxel = (startPos + 0.5f) * dims;
-    float3 stepVecVoxel = (ray.direction * stepSize) * dims;
+    tin += randJitter(uv) * stepSize;
+
+    float3 startPos = ray.origin + ray.direction * tin;
+    float3 pos = (startPos + 0.5f);
+    float3 stepVec = (ray.direction * stepSize);
     int maxSteps = int((tout - tin) / stepSize);
     
-    half trans = 1.0f;
+    float3 accColor = 0.0;
+    float transmittance = 1.0;
 
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
-        half alpha = TrailMap[int3(posVoxel)];
-        trans *= (1.0h - alpha);
-        if (trans < 0.02h) break;
-        posVoxel += stepVecVoxel;
+        if (any(pos < 0) || any(pos > 1)) break;
+        half density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
+        density = pow(density, alphaScale);
+
+        if (density > 0.001) 
+        {
+            float3 col = GetColor();
+            accColor += col * density * transmittance;
+            transmittance *= (1.0 - density);
+            if (transmittance < 0.01) break;
+        }
+        else
+        {
+            transmittance *= (1 - alphaAmb);
+        }
+
+        pos += stepVec;
     }
-    return color.rgb * (1.0h - trans);
+    return accColor;
 }
 
 Ray CreateCameraRay(float2 uv)
@@ -90,6 +136,6 @@ void Render (uint3 id : SV_DispatchThreadID)
     uv = uv * 2.0f - 1.0f;
 
     Ray ray = CreateCameraRay(uv);
-    float3 result = Trace(ray);
+    float3 result = Trace(ray, uv);
     Result[id.xy] = float4(result, 1.0f);
 }

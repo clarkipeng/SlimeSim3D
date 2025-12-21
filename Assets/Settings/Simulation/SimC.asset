@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: SimC
   m_EditorClassIdentifier: 
   stepsPerFrame: 1
-  resolution: 300
+  resolution: 100
   boundaryRadius: 150
-  numAgents: 100000
+  numAgents: 500000
   spawnMode: 3
   trailWeight: 0.1
-  decayRate: 0.1
-  diffuseRate: 10
+  decayRate: 10
+  diffuseRate: 0.1
   speciesSetting:
     moveSpeed: 10
     turnSpeed: 20

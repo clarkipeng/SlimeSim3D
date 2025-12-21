@@ -55,14 +55,19 @@ bool IntersectBounds(float3 ro, float3 rd, out float tmin, out float tmax)
     return tmax >= max(tmin, 0.0f);
 }
 
+
+float randJitter(float2 co) {
+    return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+
 float3 GetColor(float t)
 {
-    // float t = saturate(density * 2.0); // Boost contrast
     if (t < 0.5) return lerp(colorLow, colorMid, t * 2.0);
     return lerp(colorMid, colorHigh, (t - 0.5) * 2.0);
 }
 
-float3 Trace(Ray ray)
+float3 Trace(Ray ray, float2 uv)
 {
     float tin, tout;
     if (!IntersectBounds(ray.origin, ray.direction, tin, tout))
@@ -73,9 +78,10 @@ float3 Trace(Ray ray)
 
     float3 dims = float3(resolution, resolution, resolution);
     float stepSize = 1.0 / resolution;
-    // float stepSize = 0.01f;
 
-    float3 startPos = ray.origin + ray.direction * (tin + 1e-4);
+    tin += randJitter(uv) * stepSize;
+
+    float3 startPos = ray.origin + ray.direction * tin;
     float3 pos = (startPos + 0.5f);
     float3 stepVec = (ray.direction * stepSize);
     int maxSteps = int((tout - tin) / stepSize);
@@ -135,6 +141,6 @@ void Render (uint3 id : SV_DispatchThreadID)
     uv = uv * 2.0f - 1.0f;
 
     Ray ray = CreateCameraRay(uv);
-    float3 result = Trace(ray);
+    float3 result = Trace(ray, uv);
     Result[id.xy] = float4(result, 1.0f);
 }

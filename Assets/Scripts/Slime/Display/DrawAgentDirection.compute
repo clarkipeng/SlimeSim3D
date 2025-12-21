@@ -1,0 +1,65 @@
+﻿#pragma kernel DrawAgent
+
+int resolution;
+uint numAgents;
+uint width;
+
+RWTexture2D<float4> Result;
+
+struct Agent {
+    float3 position;
+    float pad0;
+    float3 direction;
+    uint rngState;
+};
+RWStructuredBuffer<Agent> agents;
+
+float4x4 viewProjection;
+
+[numthreads(256,1,1)]
+void DrawAgent (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float3 worldPos = (agent.position / (float)resolution) - 0.5f;
+
+    float4 clipPos = mul(viewProjection, float4(worldPos, 1.0f));
+
+    if (clipPos.w <= 0) return; 
+    float2 ndc = clipPos.xy / clipPos.w;
+    float2 uv = ndc * 0.5f + 0.5f;
+
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+
+    for (int i=0;i<width;i++){
+        for (int j=0;j<width;j++){
+            int2 pixel = int2(uv.x * w + i, uv.y * h + j);
+            if (pixel.x >= 0 && pixel.x < (int)w && pixel.y >= 0 && pixel.y < (int)h)
+            {
+                float3 color = agent.direction * 0.5 + 0.5;
+                int cnt = 1/Result[pixel].a;
+                float3 col_avg = (cnt-1) * Result[pixel].rgb + color.rgb;
+                col_avg /= cnt;
+                Result[pixel] = float4(col_avg,1.0f/(cnt+1));
+            }
+        }
+    }
+}
+
+
+#pragma kernel ResetAlpha
+
+[numthreads(32,32,1)]
+void ResetAlpha (uint3 id : SV_DispatchThreadID)
+{
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+    if (id.x < w && id.y < h)
+    {
+        Result[id.xy] = float4(Result[id.xy].rgb, 1);
+    }
+}

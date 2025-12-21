@@ -72,40 +72,26 @@ void Update (uint3 id : SV_DispatchThreadID)
 	half weightDown    = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
 	half weightUp      = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
 
-	float totalWeight = weightForward + weightLeft + weightRight + weightDown + weightUp;
-    
-    if (totalWeight < 0.0001f) 
-    {
-        float r1 = NextFloat(agent.rngState);
-        float r2 = NextFloat(agent.rngState);
-        float3 randomDir = (0.5f - r1) * agentRight + (0.5f - r2) * agentUp;
-        agent.direction += randomDir * turnSpeed;
-    }
-    else 
-    {
-        float randomPick = NextFloat(agent.rngState) * totalWeight;
-        float randomSteer = NextFloat(agent.rngState);
-        
-        if ((randomPick -= weightForward) < 0) 
-        {
-        }
-        else if ((randomPick -= weightLeft) < 0) 
-        {
-            agent.direction -= agentRight * turnSpeed * randomSteer;
-        }
-        else if ((randomPick -= weightRight) < 0) 
-        {
-            agent.direction += agentRight * turnSpeed * randomSteer;
-        }
-        else if ((randomPick -= weightDown) < 0) 
-        {
-            agent.direction -= agentUp * turnSpeed * randomSteer;
-        }
-        else 
-        {
-            agent.direction += agentUp * turnSpeed * randomSteer;
-        }
-    }
+	half maxWeightRadial = max(max(weightLeft, weightRight), max(weightUp, weightDown));
+	half minWeightRadial = min(min(weightLeft, weightRight), min(weightUp, weightDown));
+	
+	float rand = NextFloat(agent.rngState);
+
+	if (weightForward >= maxWeightRadial) {
+	}
+	else if (weightForward < minWeightRadial || maxWeightRadial == minWeightRadial) {
+		float r1 = NextFloat(agent.rngState);
+		float r2 = NextFloat(agent.rngState);
+		float r3 = NextFloat(agent.rngState);
+
+		float3 randomDir = (rand - r2) *  agentRight + (r3 - r1) * agentUp;
+    	agent.direction += randomDir * turnSpeed;
+	}
+	else if (weightRight == maxWeightRadial) agent.direction += agentRight * turnSpeed * rand;
+	else if (weightLeft  == maxWeightRadial) agent.direction -= agentRight * turnSpeed * rand;
+	else if (weightUp    == maxWeightRadial) agent.direction += agentUp * turnSpeed * rand;
+	else if (weightDown  == maxWeightRadial) agent.direction -= agentUp * turnSpeed * rand;
+
 	agent.direction = normalize(agent.direction);
 	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
 

@@ -1,11 +1,10 @@
 using UnityEngine;
 using ComputeShaderUtility;
 
-[CreateAssetMenu(menuName = "Slime Settings/Display/Agent")]
-public class AgentDisplayStrategy : DisplayStrategy
+[CreateAssetMenu(menuName = "Slime Settings/Display/AgentDirection")]
+public class AgentDirectionDisplayStrategy : DisplayStrategy
 {
     [Header("Shader Parameters")]
-    public Color color = Color.green;
     public int width = 1;
 
     public override void Dispatch(
@@ -35,10 +34,13 @@ public class AgentDisplayStrategy : DisplayStrategy
         shader.SetInt("numAgents", settings.numAgents);
 
         shader.SetMatrix("viewProjection", vp);
-        shader.SetVector("color", color);
         shader.SetInt("width", width);
 
         ComputeHelper.Dispatch(shader, settings.numAgents, 1, 1, kernelIndex: kernel);
+
+        int alphaKernel = shader.FindKernel("ResetAlpha");
+        shader.SetTexture(alphaKernel, "Result", destinationScreen);
+        ComputeHelper.Dispatch(shader, destinationScreen.width, destinationScreen.height, 1, kernelIndex: alphaKernel);
     }
 
 }

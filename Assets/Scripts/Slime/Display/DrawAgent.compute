@@ -3,6 +3,8 @@
 int resolution;
 uint numAgents;
 float4 color;
+uint width;
+
 RWTexture2D<float4> Result;
 
 struct Agent {
@@ -32,9 +34,14 @@ void DrawAgent (uint3 id : SV_DispatchThreadID)
     uint w, h;
     Result.GetDimensions(w, h);
     
-    int2 pixel = int2(uv.x * w, uv.y * h);
-    if (pixel.x >= 0 && pixel.x < (int)w && pixel.y >= 0 && pixel.y < (int)h)
-    {
-        Result[pixel] = color;
+
+    for (int i=0;i<width;i++){
+        for (int j=0;j<width;j++){
+            int2 pixel = int2(uv.x * w + i, uv.y * h + j);
+            if (pixel.x >= 0 && pixel.x < (int)w && pixel.y >= 0 && pixel.y < (int)h)
+            {
+                Result[pixel] = color;
+            }
+        }
     }
 }
