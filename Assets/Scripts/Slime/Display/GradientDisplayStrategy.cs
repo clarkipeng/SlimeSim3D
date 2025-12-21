@@ -25,7 +25,7 @@ public class GradientDisplayStrategy : DisplayStrategy
     )
     {
         if (shader == null) return;
-        int kernel = shader.FindKernel(kernelName);
+        int kernel = shader.FindKernel(KernelName);
 
         shader.SetInt("resolution", settings.resolution);
         shader.SetInt("boundaryRadius", settings.boundaryRadius);

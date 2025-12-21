@@ -1,9 +1,11 @@
 using UnityEngine;
 using ComputeShaderUtility;
 
-[CreateAssetMenu(menuName = "Slime Settings/Display/Agent")]
+[CreateAssetMenu(menuName = "Slime Settings/Display/Agent/Simple")]
 public class AgentDisplayStrategy : DisplayStrategy
 {
+    protected override string KernelName => "Simple";
+
     [Header("Shader Parameters")]
     public Color color = Color.green;
     public int width = 1;
@@ -17,11 +19,13 @@ public class AgentDisplayStrategy : DisplayStrategy
     )
     {
         if (shader == null) return;
-        int kernel = shader.FindKernel(kernelName);
+        int kernel = shader.FindKernel(KernelName);
 
         var old = RenderTexture.active;
         RenderTexture.active = destinationScreen;
-        GL.Clear(true, true, Color.black);
+        Color background = Color.black;
+        background.a = 0.0f;
+        GL.Clear(true, true, background);
         RenderTexture.active = old;
 
         Matrix4x4 proj = camera.projectionMatrix;

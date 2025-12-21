@@ -1,11 +1,11 @@
-﻿#pragma kernel DrawAgent
+﻿#pragma kernel Simple
 
-int resolution;
+// Shared
+uint resolution;
 uint numAgents;
-float4 color;
 uint width;
-
-RWTexture2D<float4> Result;
+// uint length;
+float4x4 viewProjection;
 
 struct Agent {
     float3 position;
@@ -13,35 +13,132 @@ struct Agent {
     float3 direction;
     uint rngState;
 };
+RWTexture2D<float4> Result;
 RWStructuredBuffer<Agent> agents;
 
-float4x4 viewProjection;
+// specific
+float4 color;
+
+int2 GetAgentScreenPos(uint id, out float depth)
+{
+    Agent agent = agents[id];
+    
+    float3 worldPos = (agent.position / (float)resolution) - 0.5f;
+    float4 clipPos = mul(viewProjection, float4(worldPos, 1.0f));
+    depth = clipPos.w;
+    if (depth <= 0) return int2(-1, -1);
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+    float2 uv = (clipPos.xy / depth) * 0.5f + 0.5f;
+    return int2(uv.x * w, uv.y * h);
+}
 
 [numthreads(256,1,1)]
-void DrawAgent (uint3 id : SV_DispatchThreadID)
+void Simple (uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= numAgents) return;
 
     Agent agent = agents[id.x];
-    float3 worldPos = (agent.position / (float)resolution) - 0.5f;
+    float depth;
+    int2 centerPixel = GetAgentScreenPos(id.x, depth);
+    if (centerPixel.x == -1) return;
+    
+    uint w, h;
+    Result.GetDimensions(w, h);
 
-    float4 clipPos = mul(viewProjection, float4(worldPos, 1.0f));
+    for (int i=0;i<width;i++){
+        for (int j=0;j<width;j++){
+            int2 px = centerPixel + int2(i,j);
+            if (px.x >= 0 && px.x < (int)w && px.y >= 0 && px.y < (int)h)
+            {
+                Result[px] = color;
+            }
+        }
+    }
+}
 
-    if (clipPos.w <= 0) return; 
-    float2 ndc = clipPos.xy / clipPos.w;
-    float2 uv = ndc * 0.5f + 0.5f;
+
+#pragma kernel DirectionSimple
+
+[numthreads(256,1,1)]
+void DirectionSimple (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float depth;
+    int2 centerPixel = GetAgentScreenPos(id.x, depth);
+    if (centerPixel.x == -1) return;
 
     uint w, h;
     Result.GetDimensions(w, h);
     
-
     for (int i=0;i<width;i++){
         for (int j=0;j<width;j++){
-            int2 pixel = int2(uv.x * w + i, uv.y * h + j);
-            if (pixel.x >= 0 && pixel.x < (int)w && pixel.y >= 0 && pixel.y < (int)h)
+            int2 px = centerPixel + int2(i,j);
+
+            if (px.x >= 0 && px.x < (int)w && px.y >= 0 && px.y < (int)h)
             {
-                Result[pixel] = color;
+                float3 color = agent.direction * 0.5 + 0.5;
+
+                float4 current = Result[px];
+                float n = (current.a > 0.001) ? (1.0f / current.a) : 0.0f; // a=0 -> no agents in px yet
+
+                float weight = 1.0f / (n + 1.0f);
+                Result[px] = float4(lerp(current.rgb, color.rgb, weight), weight);
             }
         }
+    }
+}
+
+#pragma kernel Depth
+
+float referenceDist;
+    
+[numthreads(256,1,1)]
+void Depth (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float depth;
+    int2 centerPixel = GetAgentScreenPos(id.x, depth);
+    if (centerPixel.x == -1) return;
+
+    uint w, h;
+    Result.GetDimensions(w, h);
+
+    int dwidth = max(1, (int)(width * (referenceDist / depth)));
+    for (int i=0;i<dwidth;i++){
+        for (int j=0;j<dwidth;j++){
+            int2 px = centerPixel + int2(i,j);
+
+            if (px.x >= 0 && px.x < (int)w && px.y >= 0 && px.y < (int)h)
+            {
+                float3 color = agent.direction * 0.5 + 0.5;
+                float4 current = Result[px];
+
+                float n = (current.a > 0.001) ? (1.0f / current.a) : 0.0f; // a=0 -> no agents in px yet
+
+                float weight = 1.0f / (n + 1.0f);
+                Result[px] = float4(lerp(current.rgb, color.rgb, weight), weight);
+            }
+        }
+    }
+}
+
+
+#pragma kernel ResetAlpha
+
+[numthreads(32,32,1)]
+void ResetAlpha (uint3 id : SV_DispatchThreadID)
+{
+    uint w, h;
+    Result.GetDimensions(w, h);
+    
+    if (id.x < w && id.y < h)
+    {
+        Result[id.xy] = float4(Result[id.xy].rgb, 1);
     }
 }

@@ -3,9 +3,11 @@ using ComputeShaderUtility;
 
 public abstract class DisplayStrategy : ScriptableObject
 {
+    protected virtual string KernelName => "Render";
+
     [Header("Shader Setup")]
     public ComputeShader shader;
-    public string kernelName = "Render";
+
 
     public abstract void Dispatch(
         RenderTexture sourceTrailMap,

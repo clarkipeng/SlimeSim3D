@@ -125,10 +125,11 @@ public class Simulation : MonoBehaviour
 	}
 
 	private int simFrame = 0;
-	(RenderTexture source, RenderTexture destination) GetTrailMaps()
+	(RenderTexture source, RenderTexture destination) GetTrailMaps(bool iterateFrame)
 	{
 		bool isEvenFrame = simFrame % 2 == 0;
-		simFrame += 1;
+
+		if (iterateFrame) simFrame += 1;
 
 		if (isEvenFrame)
 		{
@@ -148,7 +149,7 @@ public class Simulation : MonoBehaviour
 			outputImage.texture = displayTexture;
 		}
 		displayStrategy.Dispatch(
-			GetTrailMaps().destination,
+			GetTrailMaps(false).destination,
 			displayTexture,
 			agentBuffer,
 			settings,
@@ -166,7 +167,7 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("decayFactor", settings.decayRate * dt);
 		compute.SetFloat("trailWeight", settings.trailWeight);
 
-		var maps = GetTrailMaps();
+		var maps = GetTrailMaps(true);
 
 		compute.SetTexture(diffuseMapKernel, "TrailMap", maps.source);
 		compute.SetTexture(diffuseMapKernel, "DiffusedTrailMap", maps.destination);

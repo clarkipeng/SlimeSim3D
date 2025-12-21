@@ -1,13 +1,15 @@
 using UnityEngine;
 using ComputeShaderUtility;
 
-[CreateAssetMenu(menuName = "Slime Settings/Display/Agent/Direction")]
-public class AgentDirectionDisplayStrategy : DisplayStrategy
+[CreateAssetMenu(menuName = "Slime Settings/Display/Agent/Depth")]
+public class AgentDepthDisplayStrategy : DisplayStrategy
 {
-    protected override string KernelName => "DirectionSimple";
+    protected override string KernelName => "Depth";
 
     [Header("Shader Parameters")]
     public int width = 1;
+    [Range(0, 5)]
+    public float referenceDist = 5;
 
     public override void Dispatch(
         RenderTexture sourceTrailMap,
@@ -39,6 +41,7 @@ public class AgentDirectionDisplayStrategy : DisplayStrategy
 
         shader.SetMatrix("viewProjection", vp);
         shader.SetInt("width", width);
+        shader.SetFloat("referenceDist", referenceDist);
 
         ComputeHelper.Dispatch(shader, settings.numAgents, 1, 1, kernelIndex: kernel);
 
