@@ -3,15 +3,21 @@ using ComputeShaderUtility;
 using UnityEngine.Experimental.Rendering;
 using ComputeShaderUtility;
 
-[CreateAssetMenu(menuName = "Slime Settings/Display/Agent/Depth")]
-public class AgentDepthDisplayStrategy : DisplayStrategy
+[CreateAssetMenu(menuName = "Slime Settings/Display/Agent/Direction2")]
+public class AgentDirection2DisplayStrategy : DisplayStrategy
 {
-    protected override string KernelName => "Depth";
+    protected override string KernelName => "Direction2";
 
     [Header("Shader Parameters")]
     public int width = 1;
     [Range(0, 5)]
     public float referenceDist = 5;
+
+    [Header("Cosine Palette")]
+    public Vector3 palA = new Vector3(0.5f, 0.5f, 0.5f);
+    public Vector3 palB = new Vector3(0.5f, 0.5f, 0.5f);
+    public Vector3 palC = new Vector3(1.0f, 1.0f, 1.0f);
+    public Vector3 palD = new Vector3(0.0f, 0.33f, 0.67f);
 
     private RenderTexture depthBuffer;
 
@@ -55,6 +61,11 @@ public class AgentDepthDisplayStrategy : DisplayStrategy
         shader.SetInt("resolution", settings.resolution);
         shader.SetInt("width", width);
         shader.SetFloat("referenceDist", referenceDist);
+
+        shader.SetVector("palA", palA);
+        shader.SetVector("palB", palB);
+        shader.SetVector("palC", palC);
+        shader.SetVector("palD", palD);
 
         shader.SetMatrix("viewProjection", vp);
 

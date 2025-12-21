@@ -169,14 +169,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0173053465a956443813261665491110, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  compute: {fileID: 7200000, guid: a0aea66b8c503e748bb334583d5db67c, type: 3}
-  settings: {fileID: 11400000, guid: 5f0e79561a30442fda7369bfe4a81292, type: 2}
+  compute: {fileID: 7200000, guid: 439b1ed62044c44778f63c3e0ed62aa0, type: 3}
+  settings: {fileID: 11400000, guid: 6620ba52ab8194c0cafd5b666c97e068, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
-  displayStrategy: {fileID: 11400000, guid: 39d85ac25d80048e488a35f2a7ac9725, type: 2}
-  enablePostProcessing: 0
-  ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
+  displayStrategy: {fileID: 11400000, guid: 18b519f9fb6e54568817297da041b2fc, type: 2}
+  postProcess: 0
+  ppMaterial: {fileID: 0}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}

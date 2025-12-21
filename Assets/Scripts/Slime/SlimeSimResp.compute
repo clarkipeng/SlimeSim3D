@@ -1,0 +1,181 @@
+﻿#pragma kernel Update
+
+//consts
+float3 invSize;
+float deltaTime;
+float time;
+
+half moveSpeed;
+half turnSpeed;
+half sensorOffsetDst;
+half cosAngle;
+half sinAngle;
+
+uint numAgents;
+
+int resolution;
+int boundaryRadius;
+
+half trailWeight;
+
+Texture3D<half> ReadTrailMap; 
+SamplerState samplerReadTrailMap;
+RWTexture3D<float> WriteTrailMap;
+
+struct Agent {
+	float3 position;
+	float pad0;
+	float3 direction;
+	uint rngState;
+};
+RWStructuredBuffer<Agent> agents;
+
+// LCG Random
+float NextFloat(inout uint state)
+{
+	state += time * 100000;
+    state ^= 2747636419u;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    return state / 4294967295.0;
+}
+
+half sense(Agent agent, float3 sensorDir) {
+    float3 sensorPos = agent.position + sensorDir * sensorOffsetDst;
+	if (any(sensorPos < 0) || any(sensorPos >= resolution)) {
+        return 0;
+    }
+    float3 uv = (sensorPos + 0.5) * invSize;
+    return ReadTrailMap.SampleLevel(samplerReadTrailMap, uv, 0);
+}
+
+[numthreads(256,1,1)]
+void Update (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numAgents) {
+		return;
+	}
+
+	Agent agent = agents[id.x];
+	float3 pos = agent.position;
+
+	float3 helper = abs(agent.direction.y) < 0.999 ? float3(0, 1, 0) : float3(1, 0, 0);
+	float3 agentRight = normalize(cross(agent.direction, helper));
+	float3 agentUp    = cross(agentRight, agent.direction);
+
+	half weightForward = sense(agent, agent.direction);
+	half weightLeft    = sense(agent, agent.direction * cosAngle + agentRight * -sinAngle);
+	half weightRight   = sense(agent, agent.direction * cosAngle + agentRight * sinAngle);
+	half weightDown    = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
+	half weightUp      = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
+
+	float totalWeight = weightForward + weightLeft + weightRight + weightDown + weightUp;
+    
+    if (totalWeight < 0.0001f) 
+    {
+        float r1 = NextFloat(agent.rngState);
+        float r2 = NextFloat(agent.rngState);
+        float3 randomDir = (0.5f - r1) * agentRight + (0.5f - r2) * agentUp;
+        agent.direction += randomDir * turnSpeed;
+    }
+    else 
+    {
+        float randomPick = NextFloat(agent.rngState) * totalWeight;
+        float randomSteer = NextFloat(agent.rngState);
+        
+        if ((randomPick -= weightForward) < 0) 
+        {
+        }
+        else if ((randomPick -= weightLeft) < 0) 
+        {
+            agent.direction -= agentRight * turnSpeed * randomSteer;
+        }
+        else if ((randomPick -= weightRight) < 0) 
+        {
+            agent.direction += agentRight * turnSpeed * randomSteer;
+        }
+        else if ((randomPick -= weightDown) < 0) 
+        {
+            agent.direction -= agentUp * turnSpeed * randomSteer;
+        }
+        else 
+        {
+            agent.direction += agentUp * turnSpeed * randomSteer;
+        }
+    }
+	agent.direction = normalize(agent.direction);
+	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
+
+	float3 center = float3(resolution, resolution, resolution) * 0.5;
+    float3 offset = newPos - center;
+    float distSq = dot(offset, offset);
+    bool outsideSphere = distSq > boundaryRadius * boundaryRadius;
+    // if (outsideSphere)
+    // {
+    //     newPos = center + offset * rsqrt(distSq) * (boundaryRadius - 0.01f);
+	// 	newPos += lerp(0.5f, -0.5f, step(center, newPos)); // round towards center
+    // }
+    bool outsideBox = any(newPos < 0) || any(newPos >= resolution);
+    // if (outsideBox) 
+    // {
+    //     newPos = clamp(newPos, 0.0, resolution - 1);
+    // }
+    if (outsideSphere || outsideBox)
+    {
+		float r1 = NextFloat(agent.rngState);
+		float r2 = NextFloat(agent.rngState);
+		float r3 = NextFloat(agent.rngState);
+		float r4 = NextFloat(agent.rngState);
+		float r5 = NextFloat(agent.rngState);
+		float r6 = NextFloat(agent.rngState);
+        float3 randDir = float3(r1-r4,r2-r5,r3-r5) - 0.5f;
+		if (outsideSphere && dot(offset, randDir) > 0.0f)
+		{
+			randDir = -randDir;
+		}
+        agent.direction = normalize(randDir);
+        newPos = center;
+    }
+
+	WriteTrailMap[int3(newPos)] += trailWeight;
+	
+	agent.position = newPos;
+	agents[id.x] = agent;
+}
+
+#pragma kernel Diffuse
+
+half diffuseFactor;
+half decayFactor;
+
+Texture3D<half> TrailMap;
+SamplerState samplerTrailMap;
+RWTexture3D<float4> DiffusedTrailMap;
+
+[numthreads(8,8,4)]
+void Diffuse (uint3 id : SV_DispatchThreadID)
+{
+	if (any(id >= uint3(resolution, resolution, resolution))) return;
+
+	int3 pos = int3(id);
+	half sum = TrailMap.Load(int4(pos, 0));
+
+	sum += TrailMap.Load(int4(max(0, pos + int3(-1, 0, 0)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 1, 0, 0)), 0));
+    
+    sum += TrailMap.Load(int4(max(0, pos + int3( 0,-1, 0)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 0, 1, 0)), 0));
+    
+    sum += TrailMap.Load(int4(max(0, pos + int3( 0, 0,-1)), 0));
+    sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 0, 0, 1)), 0));
+	
+	half original = TrailMap[id];
+
+    half blurred = sum * 0.142857h;
+    half result = lerp(original, blurred, diffuseFactor);
+	
+    DiffusedTrailMap[id] = max(0.0h, result - decayFactor);
+}

@@ -9,9 +9,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e473adcf4dc284a639a60c84e8ea8cd8, type: 3}
-  m_Name: AgentDepth
+  m_Script: {fileID: 11500000, guid: 8e4a7ebbaef604ae2a16dc4f4706837d, type: 3}
+  m_Name: AgentDirection2
   m_EditorClassIdentifier: 
   shader: {fileID: 7200000, guid: 9d6969cce8474ed4899115f5d816b0a5, type: 3}
   width: 1
-  referenceDist: 1.7
+  referenceDist: 1.53
+  palA: {x: 0.5, y: 0.5, z: 0.5}
+  palB: {x: 4.09, y: 0.5, z: 0.5}
+  palC: {x: 1, y: 1, z: 1}
+  palD: {x: 0.33, y: 0.33, z: 0.67}

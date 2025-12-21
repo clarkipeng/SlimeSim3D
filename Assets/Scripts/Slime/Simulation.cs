@@ -23,6 +23,10 @@ public class Simulation : MonoBehaviour
 	[Header("Display Strategy")]
 	public DisplayStrategy displayStrategy;
 
+	[Header("Post Processing")]
+	public bool postProcess = false;
+	public Material ppMaterial;
+
 	[SerializeField, HideInInspector] protected RenderTexture trailMap;
 	[SerializeField, HideInInspector] protected RenderTexture diffusedTrailMap;
 	[SerializeField, HideInInspector] protected RenderTexture displayTexture;
@@ -155,6 +159,13 @@ public class Simulation : MonoBehaviour
 			settings,
 			camera
 		);
+		if (postProcess && ppMaterial != null)
+		{
+			RenderTexture temp = RenderTexture.GetTemporary(displayTexture.descriptor);
+			Graphics.Blit(displayTexture, temp, ppMaterial);
+			Graphics.Blit(temp, displayTexture);
+			RenderTexture.ReleaseTemporary(temp);
+		}
 	}
 
 	void RunSimulation()

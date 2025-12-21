@@ -19,7 +19,16 @@ RWStructuredBuffer<Agent> agents;
 // specific
 float4 color;
 
-int2 GetAgentScreenPos(uint id, out float depth)
+
+float2 randJitter(uint id) {
+    float n = (float)id;
+    return float2(
+        frac(sin(n * 12.9898 + 78.233) * 43758.5453), // Jitter X
+        frac(sin(n * 39.7867 + 12.989) * 43758.5453)  // Jitter Y
+    ) - 0.5f;
+}
+
+float2 GetAgentScreenPos(uint id, out float depth)
 {
     Agent agent = agents[id];
     
@@ -31,7 +40,7 @@ int2 GetAgentScreenPos(uint id, out float depth)
     Result.GetDimensions(w, h);
     
     float2 uv = (clipPos.xy / depth) * 0.5f + 0.5f;
-    return int2(uv.x * w, uv.y * h);
+    return float2(uv.x * w, uv.y * h) + randJitter(id);
 }
 
 [numthreads(256,1,1)]
@@ -92,42 +101,6 @@ void DirectionSimple (uint3 id : SV_DispatchThreadID)
     }
 }
 
-#pragma kernel Depth
-
-float referenceDist;
-    
-[numthreads(256,1,1)]
-void Depth (uint3 id : SV_DispatchThreadID)
-{
-    if (id.x >= numAgents) return;
-
-    Agent agent = agents[id.x];
-    float depth;
-    int2 centerPixel = GetAgentScreenPos(id.x, depth);
-    if (centerPixel.x == -1) return;
-
-    uint w, h;
-    Result.GetDimensions(w, h);
-
-    int dwidth = max(1, (int)(width * (referenceDist / depth)));
-    for (int i=0;i<dwidth;i++){
-        for (int j=0;j<dwidth;j++){
-            int2 px = centerPixel + int2(i,j);
-
-            if (px.x >= 0 && px.x < (int)w && px.y >= 0 && px.y < (int)h)
-            {
-                float3 color = agent.direction * 0.5 + 0.5;
-                float4 current = Result[px];
-
-                float n = (current.a > 0.001) ? (1.0f / current.a) : 0.0f; // a=0 -> no agents in px yet
-
-                float weight = 1.0f / (n + 1.0f);
-                Result[px] = float4(lerp(current.rgb, color.rgb, weight), weight);
-            }
-        }
-    }
-}
-
 
 #pragma kernel ResetAlpha
 
@@ -140,5 +113,133 @@ void ResetAlpha (uint3 id : SV_DispatchThreadID)
     if (id.x < w && id.y < h)
     {
         Result[id.xy] = float4(Result[id.xy].rgb, 1);
+    }
+}
+
+#pragma kernel Depth
+
+float referenceDist;
+RWTexture2D<int> DepthBuffer;//fast with InterlockedMin
+    
+[numthreads(256,1,1)]
+void Depth (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float depth;
+    float2 center = GetAgentScreenPos(id.x, depth);
+    if (center.x == -1) return;
+
+    uint w, h;
+    Result.GetDimensions(w, h);
+
+    float radius = (width * 0.5f) * (referenceDist / depth);
+    float radius2 = radius*radius;
+    int depthQ = 1000000 * depth;
+
+    float3 color = agent.direction * 0.5f + 0.5f;
+
+    for (int x = max(0,floor(center.x - radius)); x <= min(w,ceil(center.x + radius)); x++)
+    {
+        for (int y = max(0,floor(center.y - radius)); y <= min(h,ceil(center.y + radius)); y++)
+        {
+            int2 px = int2(x,y);
+            float2 pixelCenter = px + 0.5f;
+            float2 diff = pixelCenter - center;
+            float dist2 = dot(diff, diff);
+
+            if (dist2 <= radius2)
+            {
+                int prevDepth;
+                prevDepth = DepthBuffer[px];
+                DepthBuffer[px] = min(prevDepth,depthQ);
+                float3 prev = Result[px].rgb;
+
+                if (prevDepth > depthQ)
+                {
+                    float dist = sqrt(dist2);
+                    float alpha = 1.0f - smoothstep(radius - 0.5f, radius + 0.5f, dist);
+                    if (alpha < 0.01f) continue;
+
+                    Result[px] = float4(prev * (1-alpha) + color * alpha,1.0f);
+                }
+            }
+
+        }
+    }
+}
+
+
+#pragma kernel ResetDepth
+[numthreads(32,32,1)]
+void ResetDepth (uint3 id : SV_DispatchThreadID)
+{
+    uint w, h;
+    DepthBuffer.GetDimensions(w, h);
+    if (id.x < w && id.y < h)
+    {
+        DepthBuffer[id.xy] = 2147483647;
+    }
+}
+
+
+#pragma kernel Direction2
+
+float3 palA; // Offset (Brightness)
+float3 palB; // Amplitude (Contrast)
+float3 palC; // Frequency (Loops)
+float3 palD; // Phase (Shift)
+
+float3 cosinePalette(float3 dir)
+{
+    return palA + palB * cos(6.283185 * (palC * dir + palD));
+}
+
+[numthreads(256,1,1)]
+void Direction2 (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= numAgents) return;
+
+    Agent agent = agents[id.x];
+    float depth;
+    float2 center = GetAgentScreenPos(id.x, depth);
+    if (center.x == -1) return;
+
+    uint w, h;
+    Result.GetDimensions(w, h);
+
+    float radius = (width * 0.5f) * (referenceDist / depth);
+    float radius2 = radius * radius;
+    int depthQ = (int)(1000000 * depth);
+
+    float3 color = cosinePalette(agent.direction);
+
+    for (int x = max(0,floor(center.x - radius)); x <= min(w,ceil(center.x + radius)); x++)
+    {
+        for (int y = max(0,floor(center.y - radius)); y <= min(h,ceil(center.y + radius)); y++)
+        {
+            int2 px = int2(x,y);
+            float2 pixelCenter = px + 0.5f;
+            float2 diff = pixelCenter - center;
+            float dist2 = dot(diff, diff);
+
+            if (dist2 <= radius2)
+            {
+                int prevDepth;
+                prevDepth = DepthBuffer[px];
+                DepthBuffer[px] = min(prevDepth,depthQ);
+                float3 prev = Result[px].rgb;
+
+                if (prevDepth > depthQ)
+                {
+                    float dist = sqrt(dist2);
+                    float alpha = 1.0f - smoothstep(radius - 0.5f, radius + 0.5f, dist);
+                    if (alpha < 0.01f) continue;
+
+                    Result[px] = float4(prev * (1-alpha) + color * alpha,1.0f);
+                }
+            }
+        }
     }
 }
