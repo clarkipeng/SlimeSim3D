@@ -66,7 +66,7 @@ half sense(Agent agent, float3 sensorDir) {
             }
         }
     }
-    return sum;// / (sensorSize * sensorSize);
+    return pow(sum / (sensorSize * sensorSize),2);
 }
 
 [numthreads(256,1,1)]
@@ -93,8 +93,14 @@ void Update (uint3 id : SV_DispatchThreadID)
     half maxWeight = max(max(weightLeft,weightRight), max(weightUp,weightDown));
     half minWeight = min(min(weightLeft,weightRight), min(weightUp,weightDown));
     
-    if (weightForward > maxWeight || minWeight == maxWeight)
+    if (weightForward > maxWeight)
     {
+    }
+    else if (minWeight == maxWeight){
+        float r1 = NextFloat(agent.rngState);
+        float r2 = NextFloat(agent.rngState);
+        float3 randomDir = (0.5f - r1) * agentRight + (0.5f - r2) * agentUp;
+        agent.direction += randomDir * turnSpeed;
     }
     else 
     {

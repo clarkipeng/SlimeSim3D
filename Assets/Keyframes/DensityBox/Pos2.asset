@@ -31,10 +31,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
   m_Name: Shot_2_Settings
   m_EditorClassIdentifier: 
-  shader: {fileID: 7200000, guid: 8ddeba4f3e71a49cdb1766c8541eeedd, type: 3}
+  shader: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
   colorLow: {r: 0, g: 0.11240196, b: 1, a: 1}
   colorMid: {r: 1, g: 0.018100992, b: 0, a: 1}
   colorHigh: {r: 1, g: 1, b: 1, a: 1}
   midThresh: 0.5
   alphaScale: 1
   alphaAmb: 0.00001
+  slicePlane: {x: 0, y: 0, z: 0, w: 0}

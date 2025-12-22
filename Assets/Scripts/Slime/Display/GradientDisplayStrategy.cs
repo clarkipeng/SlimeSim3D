@@ -17,6 +17,7 @@ public class GradientDisplayStrategy : DisplayStrategy
     public float alphaScale = 1.0f;
     [LogarithmicRange(0.00001f, 1, 10)]
     public float alphaAmb = 0.00001f;
+    public Vector4 slicePlane = new Vector4(0, 0, 0, 0);
 
     public override void Dispatch(
         RenderTexture sourceTrailMap,
@@ -40,6 +41,7 @@ public class GradientDisplayStrategy : DisplayStrategy
 
         shader.SetFloat("alphaScale", alphaScale);
         shader.SetFloat("alphaAmb", alphaAmb);
+        shader.SetVector("slicePlane", slicePlane);
 
         shader.SetTexture(kernel, "TrailMap", sourceTrailMap);
         shader.SetTexture(kernel, "Result", destinationScreen);

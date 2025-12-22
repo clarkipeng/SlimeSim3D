@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4903465878687267490
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
+  m_Name: Shot_4_Settings
+  m_EditorClassIdentifier: 
+  shader: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
+  colorLow: {r: 0, g: 0, b: 1, a: 1}
+  colorMid: {r: 1, g: 0, b: 0, a: 1}
+  colorHigh: {r: 1, g: 1, b: 1, a: 1}
+  midThresh: 0.5
+  alphaScale: 2.71
+  alphaAmb: 0.00001
+  slicePlane: {x: 0, y: 0, z: 0, w: 0}
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
+  m_Name: Pos3Col2
+  m_EditorClassIdentifier: 
+  duration: 5
+  holdTime: 0
+  easing: 2
+  yaw: -145.75
+  pitch: -10
+  radius: 1
+  displaySettings: {fileID: -4903465878687267490}

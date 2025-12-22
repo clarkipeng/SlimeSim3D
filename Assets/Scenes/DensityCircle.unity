@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
   - component: {fileID: 178986027}
+  - component: {fileID: 178986028}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -169,14 +170,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0173053465a956443813261665491110, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  compute: {fileID: 7200000, guid: daf617023ca94439a8e316e55a3f97e8, type: 3}
-  settings: {fileID: 11400000, guid: 4520a3550ba264bc48c806d109dd04f8, type: 2}
+  compute: {fileID: 7200000, guid: a8be0a652e26249f1a4bb727a764f684, type: 3}
+  settings: {fileID: 11400000, guid: 9a26b7617bf014d418bfc4cc8c55e650, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
-  displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  displayStrategy: {fileID: 11400000, guid: 75904bf289f654aca9b034d5f5e5b82d, type: 2}
   postProcess: 0
-  ppMaterial: {fileID: 0}
+  ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}
@@ -189,7 +190,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 178986024}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfed1c6ce4d1c4aeca2ec86c4d9f998f, type: 3}
   m_Name: 
@@ -205,6 +206,38 @@ MonoBehaviour:
   startPitch: 0
   startRadius: 10
   endRadius: 1
+--- !u!114 &178986028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7c888bde88d4f4f838cd35e93148bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  orbitCamera: {fileID: 963194229}
+  activeSettings: {fileID: 11400000, guid: 75904bf289f654aca9b034d5f5e5b82d, type: 2}
+  playOnStart: 1
+  loop: 0
+  timeline:
+  - {fileID: 11400000, guid: 69620b6a118c5420db3d85eb8ea9ac88, type: 2}
+  - {fileID: 11400000, guid: b286f05a213e14769b851195c733d8ae, type: 2}
+  - {fileID: 11400000, guid: db5d8791db97646dbb3cb7ad6f756e66, type: 2}
+  - {fileID: 11400000, guid: f485556f933ef499e920ef43ea49c76f, type: 2}
+  - {fileID: 11400000, guid: 7caf5af0b9fda4b53b9071f6cb29c743, type: 2}
+  - {fileID: 11400000, guid: 2d462a8f5a96d40b1b474ca2abf75a3a, type: 2}
+  - {fileID: 11400000, guid: 60f49ba0f6c6c4e5c8bf28ad2f8d9a55, type: 2}
+  - {fileID: 11400000, guid: be25f03b1125d45e59976a2477f020e6, type: 2}
+  - {fileID: 11400000, guid: fae9d504a568d4b58aaae06d09631d76, type: 2}
+  - {fileID: 11400000, guid: 1ad884ce10dbf4d2f897a28a6b255442, type: 2}
+  - {fileID: 11400000, guid: f9bd03240b3b44d879b98371ab751cfe, type: 2}
+  - {fileID: 11400000, guid: 542811cd2daf64243b62f4e33c05d51b, type: 2}
+  - {fileID: 11400000, guid: e155eec71044f4035ad64888aa5af4bf, type: 2}
+  - {fileID: 11400000, guid: 5f9d2e5568b154e7b916d05a7b7bd6cd, type: 2}
+  - {fileID: 11400000, guid: 24376df3d3b6f441ebb335a774f69864, type: 2}
 --- !u!1 &506224650
 GameObject:
   m_ObjectHideFlags: 0

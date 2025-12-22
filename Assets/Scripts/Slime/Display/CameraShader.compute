@@ -12,6 +12,8 @@ half alphaAmb;
 int resolution;
 int boundaryRadius;
 
+float4 slicePlane; // plane norm, w = dist from origin
+
 RWTexture2D<float4> Result;
 
 struct Ray
@@ -20,6 +22,16 @@ struct Ray
     float3 direction;
 };
 
+float IntersectPlane(float3 ro, float3 rd, float4 plane)
+{
+    float denom = dot(rd, plane.xyz);
+    if (abs(denom) > 1e-6) // Avoid division by zero
+    {
+        float t = -(dot(ro, plane.xyz) + plane.w) / denom;
+        return t;
+    }
+    return -1.0;
+}
 bool IntersectBounds(float3 ro, float3 rd, out float tmin, out float tmax)
 {
     float3 invDir = 1.0f / rd;
@@ -48,6 +60,19 @@ bool IntersectBounds(float3 ro, float3 rd, out float tmin, out float tmax)
 
     tmin = max(boxTmin, sphereTmin);
     tmax = min(boxTmax, sphereTmax);
+
+    float distToPlane = dot(ro, slicePlane.xyz) + slicePlane.w;
+    float planeT = IntersectPlane(ro, rd, slicePlane);
+
+    if (distToPlane > 0)
+    {
+        if (planeT > 0) tmin = max(tmin, planeT);
+        else if (planeT < 0 && dot(rd, slicePlane.xyz) > 0) return false;
+    }
+    else
+    {
+        if (planeT > 0) tmax = min(tmax, planeT);
+    }
 
     return tmax >= max(tmin, 0.0f);
 }
@@ -109,6 +134,7 @@ float3 TraceDefault(Ray ray, float2 uv)
 
         if (density > 0.000001) 
         {
+            density = (1-alphaAmb) * density + alphaAmb;
             float3 col = GetDefaultColor();
             accColor += col * density * transmittance;
             transmittance *= (1.0 - density);
@@ -143,6 +169,10 @@ void Default (uint3 id : SV_DispatchThreadID)
 #pragma kernel Gradient
 
 float4 frontColor, backColor;
+// float threshold;
+
+// static float3 lightDir = normalize(float3(-1, 1, -1));
+// static float shadowStrength = 2.0;
 
 float3 GetGradientColor(float t)
 {
@@ -171,6 +201,8 @@ float3 TraceGradient(Ray ray, float2 uv)
     float3 accColor = 0.0;
     float transmittance = 1.0;
 
+    // float3 lightOffset = lightDir * stepSize * 2.0;
+
     [loop]
     for(int i = 0; i < maxSteps; i++)
     {
@@ -178,11 +210,19 @@ float3 TraceGradient(Ray ray, float2 uv)
         float density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
         density = pow(density, alphaScale);
 
+        // float lightDensity = TrailMap.SampleLevel(samplerTrailMap, pos + lightOffset, 0);
+        // float shadow = saturate((lightDensity - density) * shadowStrength);
+
+        // float3 col = GetStructureColor(density * densityContrast);
+        float radiusSq = dot(pos - 0.5, pos - 0.5) * 4;
+        float3 col = GetGradientColor(sqrt(radiusSq));
+        // col *= (1.0 - shadow * 0.8);
+
         if (density > 0.00001) 
         {
-            float radiusSq = dot(pos - 0.5, pos - 0.5) * 4;
-            float3 col = GetGradientColor(radiusSq);
-            accColor += col * density * transmittance;
+            density = (1-alphaAmb) * density + alphaAmb;
+            float absorption = saturate(density);
+            accColor += col * absorption * transmittance;
             transmittance *= (1.0 - density);
             if (transmittance < 0.01) break;
         }

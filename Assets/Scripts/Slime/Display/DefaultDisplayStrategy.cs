@@ -8,6 +8,7 @@ public class DefaultDisplayStrategy : DisplayStrategy
 
     [Header("Shader Parameters")]
     public Color color = Color.green;
+    public Vector4 slicePlane = new Vector4(0, 0, 0, 0);
 
     public override void Dispatch(
         RenderTexture sourceTrailMap,
@@ -25,6 +26,7 @@ public class DefaultDisplayStrategy : DisplayStrategy
         shader.SetMatrix("cameraInverseProjection", camera.projectionMatrix.inverse);
 
         shader.SetVector("color", color);
+        shader.SetVector("slicePlane", slicePlane);
 
         shader.SetTexture(kernel, "TrailMap", sourceTrailMap);
         shader.SetTexture(kernel, "Result", destinationScreen);

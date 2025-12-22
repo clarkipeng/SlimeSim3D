@@ -6,10 +6,10 @@ Preset:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: 1
+  m_Name: 6
   m_TargetType:
     m_NativeTypeID: 114
-    m_ManagedTypePPtr: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
+    m_ManagedTypePPtr: {fileID: 11500000, guid: f2e3a152f9d5c4635ad62c044b708c56, type: 3}
     m_ManagedTypeFallback: 
   m_Properties:
   - target: {fileID: 0}
@@ -27,65 +27,61 @@ Preset:
   - target: {fileID: 0}
     propertyPath: shader
     value: 
-    objectReference: {fileID: 7200000, guid: 8ddeba4f3e71a49cdb1766c8541eeedd, type: 3}
+    objectReference: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
   - target: {fileID: 0}
-    propertyPath: colorLow.r
+    propertyPath: primaryColor.r
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: primaryColor.g
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: primaryColor.b
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: primaryColor.a
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: secondaryColor.r
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: secondaryColor.g
+    value: 0.085130036
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: secondaryColor.b
     value: 0
     objectReference: {fileID: 0}
   - target: {fileID: 0}
-    propertyPath: colorLow.g
-    value: 0.11240196
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorLow.b
+    propertyPath: secondaryColor.a
     value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorLow.a
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorMid.r
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorMid.g
-    value: 0.018100992
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorMid.b
-    value: 0
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorMid.a
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorHigh.r
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorHigh.g
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorHigh.b
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: colorHigh.a
-    value: 1
-    objectReference: {fileID: 0}
-  - target: {fileID: 0}
-    propertyPath: midThresh
-    value: 0.5
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: alphaScale
-    value: 1
+    value: 5
     objectReference: {fileID: 0}
   - target: {fileID: 0}
     propertyPath: alphaAmb
     value: 0.00001
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: slicePlane.x
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: slicePlane.y
+    value: 1
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: slicePlane.z
+    value: 0
+    objectReference: {fileID: 0}
+  - target: {fileID: 0}
+    propertyPath: slicePlane.w
+    value: 0.5
     objectReference: {fileID: 0}
   m_ExcludedProperties: []

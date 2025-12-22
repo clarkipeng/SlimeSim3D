@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
-  m_Name: Pos5
+  m_Name: Pos9
   m_EditorClassIdentifier: 
   duration: 5
   holdTime: 0
   easing: 2
-  yaw: 235.37498
-  pitch: 3.25
-  radius: 1.4999999
-  displaySettings: {fileID: 4866142287453961636}
---- !u!114 &4866142287453961636
+  yaw: 266.87497
+  pitch: 45.249996
+  radius: 1.0000001
+  displaySettings: {fileID: 973505748923326661}
+--- !u!114 &973505748923326661
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -28,14 +28,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
-  m_Name: Shot_5_Settings
+  m_Script: {fileID: 11500000, guid: f2e3a152f9d5c4635ad62c044b708c56, type: 3}
+  m_Name: Shot_6_Settings
   m_EditorClassIdentifier: 
   shader: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
-  colorLow: {r: 0.037613153, g: 1, b: 0, a: 1}
-  colorMid: {r: 1, g: 0.9117421, b: 0, a: 1}
-  colorHigh: {r: 0, g: 0, b: 0, a: 1}
-  midThresh: 0.51
-  alphaScale: 1
+  primaryColor: {r: 1, g: 1, b: 1, a: 1}
+  secondaryColor: {r: 0, g: 0.017493963, b: 1, a: 1}
+  alphaScale: 5
   alphaAmb: 0.00001
-  slicePlane: {x: 0, y: 0, z: 0, w: 0}
+  slicePlane: {x: 1, y: 1, z: 0, w: 0}

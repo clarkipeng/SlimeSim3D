@@ -12,16 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2665318e53759e74db7a2d8238331945, type: 3}
   m_Name: SimD
   m_EditorClassIdentifier: 
-  stepsPerFrame: 3
-  resolution: 200
-  boundaryRadius: 100
-  numAgents: 500000
+  stepsPerFrame: 1
+  resolution: 250
+  boundaryRadius: 125
+  numAgents: 300000
   spawnMode: 3
-  trailWeight: 1
-  decayRate: 3
-  diffuseRate: 0.1
+  trailWeight: 0.1
+  decayRate: 0.09
+  diffuseRate: 1
   speciesSetting:
-    moveSpeed: 4
+    moveSpeed: 15
     turnSpeed: 30
-    sensorAngleSpacing: 20
-    sensorOffsetDst: 8
+    sensorAngleSpacing: 40
+    sensorOffsetDst: 20
+    sensorSize: 1

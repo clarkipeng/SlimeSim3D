@@ -18,6 +18,7 @@ public class CinematicSequencer : MonoBehaviour
     private DisplayStrategy tempStartSettings;
     private List<FieldInfo> floatFields = new List<FieldInfo>();
     private List<FieldInfo> vec3Fields = new List<FieldInfo>();
+    private List<FieldInfo> vec4Fields = new List<FieldInfo>();
     private List<FieldInfo> intFields = new List<FieldInfo>();
     private List<FieldInfo> colorFields = new List<FieldInfo>();
 
@@ -30,6 +31,7 @@ public class CinematicSequencer : MonoBehaviour
         {
             if (f.FieldType == typeof(float)) floatFields.Add(f);
             else if (f.FieldType == typeof(Vector3)) vec3Fields.Add(f);
+            else if (f.FieldType == typeof(Vector4)) vec4Fields.Add(f);
             else if (f.FieldType == typeof(Color)) colorFields.Add(f);
             else if (f.FieldType == typeof(int)) intFields.Add(f);
         }
@@ -122,6 +124,7 @@ public class CinematicSequencer : MonoBehaviour
         if (a == null || b == null) return;
         foreach (var f in floatFields) f.SetValue(target, Mathf.Lerp((float)f.GetValue(a), (float)f.GetValue(b), t));
         foreach (var f in vec3Fields) f.SetValue(target, Vector3.Lerp((Vector3)f.GetValue(a), (Vector3)f.GetValue(b), t));
+        foreach (var f in vec4Fields) f.SetValue(target, Vector4.Lerp((Vector4)f.GetValue(a), (Vector4)f.GetValue(b), t));
         foreach (var f in colorFields) f.SetValue(target, Color.Lerp((Color)f.GetValue(a), (Color)f.GetValue(b), t));
         foreach (var f in intFields) f.SetValue(target, (int)Mathf.Lerp((int)f.GetValue(a), (int)f.GetValue(b), t));
     }
@@ -131,6 +134,7 @@ public class CinematicSequencer : MonoBehaviour
         if (source == null || dest == null) return;
         foreach (var f in floatFields) f.SetValue(dest, f.GetValue(source));
         foreach (var f in vec3Fields) f.SetValue(dest, f.GetValue(source));
+        foreach (var f in vec4Fields) f.SetValue(dest, f.GetValue(source));
         foreach (var f in colorFields) f.SetValue(dest, f.GetValue(source));
         foreach (var f in intFields) f.SetValue(dest, f.GetValue(source));
     }
@@ -140,6 +144,7 @@ public class CinematicSequencer : MonoBehaviour
         if (source == null || dest == null) return false;
         foreach (var f in floatFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
         foreach (var f in vec3Fields) if (f.GetValue(dest) != f.GetValue(source)) return false;
+        foreach (var f in vec4Fields) if (f.GetValue(dest) != f.GetValue(source)) return false;
         foreach (var f in colorFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
         foreach (var f in intFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
         return true;
@@ -152,7 +157,7 @@ public class CinematicSequencer : MonoBehaviour
 
         string sceneName = SceneManager.GetActiveScene().name;
         string folderPath = $"Assets/Keyframes/{sceneName}";
-        
+
         if (!System.IO.Directory.Exists(folderPath))
         {
             System.IO.Directory.CreateDirectory(folderPath);
@@ -163,22 +168,23 @@ public class CinematicSequencer : MonoBehaviour
         shot.name = "Shot_" + (timeline.Count + 1);
 
         bool createNewSetting = true;
-        for (int prev =0; prev < timeline.Count; prev++)
+        for (int prev = 0; prev < timeline.Count; prev++)
         {
             var lastKeyframe = timeline[prev];
             if (AreSettingsIdentical(lastKeyframe.displaySettings, activeSettings))
             {
                 shot.displaySettings = lastKeyframe.displaySettings;
-                shot.displaySettings.name =  "Shot_" + (prev+1) + "_Settings";
+                shot.displaySettings.name = "Shot_" + (prev + 1) + "_Settings";
                 createNewSetting = false;
                 break;
             }
         }
-        if (createNewSetting){
+        if (createNewSetting)
+        {
             shot.displaySettings = Instantiate(activeSettings);
             shot.displaySettings.name = shot.name + "_Settings";
         }
-        
+
         shot.yaw = orbitCamera.yaw;
         shot.pitch = orbitCamera.pitch;
         shot.radius = orbitCamera.radius;
