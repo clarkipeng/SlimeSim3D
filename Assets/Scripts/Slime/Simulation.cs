@@ -109,6 +109,7 @@ public class Simulation : MonoBehaviour
 		compute.SetFloat("moveSpeed", s.moveSpeed);
 		compute.SetFloat("turnSpeed", s.turnSpeed / 180f);
 		compute.SetFloat("sensorOffsetDst", s.sensorOffsetDst);
+		compute.SetInt("sensorSize", s.sensorSize);
 
 		float angleRad = s.sensorAngleSpacing * Mathf.Deg2Rad;
 		compute.SetFloat("cosAngle", Mathf.Cos(angleRad));

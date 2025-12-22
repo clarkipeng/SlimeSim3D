@@ -169,12 +169,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0173053465a956443813261665491110, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  compute: {fileID: 7200000, guid: a0aea66b8c503e748bb334583d5db67c, type: 3}
-  settings: {fileID: 11400000, guid: 4520a3550ba264bc48c806d109dd04f8, type: 2}
+  compute: {fileID: 7200000, guid: a8be0a652e26249f1a4bb727a764f684, type: 3}
+  settings: {fileID: 11400000, guid: 9a26b7617bf014d418bfc4cc8c55e650, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
   displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  postProcess: 0
+  ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}
@@ -187,7 +189,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 178986024}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfed1c6ce4d1c4aeca2ec86c4d9f998f, type: 3}
   m_Name: 
@@ -389,6 +391,7 @@ MonoBehaviour:
   radius: 10
   yaw: 0
   pitch: 0
+  enableInput: 1
   gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &1066109336
 GameObject:

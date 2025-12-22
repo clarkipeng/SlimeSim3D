@@ -148,12 +148,12 @@ void Update (uint3 id : SV_DispatchThreadID)
 
 #pragma kernel Diffuse
 
-half diffuseFactor;
-half decayFactor;
+float diffuseFactor;
+float decayFactor;
 
-Texture3D<half> TrailMap;
+Texture3D<float> TrailMap;
 SamplerState samplerTrailMap;
-RWTexture3D<float4> DiffusedTrailMap;
+RWTexture3D<float> DiffusedTrailMap;
 
 [numthreads(8,8,4)]
 void Diffuse (uint3 id : SV_DispatchThreadID)
@@ -161,7 +161,7 @@ void Diffuse (uint3 id : SV_DispatchThreadID)
 	if (any(id >= uint3(resolution, resolution, resolution))) return;
 
 	int3 pos = int3(id);
-	half sum = TrailMap.Load(int4(pos, 0));
+	float sum = TrailMap.Load(int4(pos, 0));
 
 	sum += TrailMap.Load(int4(max(0, pos + int3(-1, 0, 0)), 0));
     sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 1, 0, 0)), 0));
@@ -172,10 +172,11 @@ void Diffuse (uint3 id : SV_DispatchThreadID)
     sum += TrailMap.Load(int4(max(0, pos + int3( 0, 0,-1)), 0));
     sum += TrailMap.Load(int4(min(resolution-1, pos + int3( 0, 0, 1)), 0));
 	
-	half original = TrailMap[id];
 
-    half blurred = sum * 0.142857h;
-    half result = lerp(original, blurred, diffuseFactor);
+	float original = TrailMap[id];
+
+    float blurred = sum * 0.142857f;
+    float result = lerp(original, blurred, diffuseFactor);
 	
-    DiffusedTrailMap[id] = max(0.0h, result - decayFactor);
+    DiffusedTrailMap[id] = max(0.0f, result - decayFactor);
 }

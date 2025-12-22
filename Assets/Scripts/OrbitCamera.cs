@@ -17,6 +17,8 @@ public class OrbitCamera : MonoBehaviour
     public float radius = 10.0f;
     public float yaw = 0f;
     public float pitch = 0f;
+
+    public bool enableInput = true;
     private float targetRadius;
     private float targetYaw;
     private float targetPitch;
@@ -44,23 +46,26 @@ public class OrbitCamera : MonoBehaviour
     {
         if (target == null) return;
 
-        // Mouse Input modifies the public attributes directly
-        if (Input.GetMouseButton(0))
+        if (enableInput)
         {
-            targetYaw += Input.GetAxis("Mouse X") * rotateSpeed;
-            targetPitch -= Input.GetAxis("Mouse Y") * rotateSpeed;
+            // Mouse Input modifies the public attributes directly
+            if (Input.GetMouseButton(0))
+            {
+                targetYaw += Input.GetAxis("Mouse X") * rotateSpeed;
+                targetPitch -= Input.GetAxis("Mouse Y") * rotateSpeed;
 
-            targetPitch = Mathf.Clamp(targetPitch, -89f, 89f);
+                targetPitch = Mathf.Clamp(targetPitch, -89f, 89f);
+            }
+
+            float scrollDelta = Input.GetAxis("Mouse ScrollWheel");
+            targetRadius -= scrollDelta * zoomSpeed;
+            targetRadius = Mathf.Clamp(targetRadius, minRadius, maxRadius);
+
+            float lerpFactor = Time.deltaTime * smoothSpeed;
+            yaw = Mathf.Lerp(yaw, targetYaw, lerpFactor);
+            pitch = Mathf.Lerp(pitch, targetPitch, lerpFactor);
+            radius = Mathf.Lerp(radius, targetRadius, lerpFactor);
         }
-
-        float scrollDelta = Input.GetAxis("Mouse ScrollWheel");
-        targetRadius -= scrollDelta * zoomSpeed;
-        targetRadius = Mathf.Clamp(targetRadius, minRadius, maxRadius);
-
-        float lerpFactor = Time.deltaTime * smoothSpeed;
-        yaw = Mathf.Lerp(yaw, targetYaw, lerpFactor);
-        pitch = Mathf.Lerp(pitch, targetPitch, lerpFactor);
-        radius = Mathf.Lerp(radius, targetRadius, lerpFactor);
 
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
         Vector3 positionOffset = rotation * new Vector3(0, 0, -radius);
@@ -91,5 +96,17 @@ public class OrbitCamera : MonoBehaviour
     public void setRadius(float x)
     {
         radius = targetRadius = x;
+    }
+
+    public void Enable()
+    {
+        targetYaw = yaw;
+        targetPitch = pitch;
+        targetRadius = radius;
+        enableInput = true;
+    }
+    public void Disable()
+    {
+        enableInput = false;
     }
 }

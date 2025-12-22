@@ -7,6 +7,8 @@ using UnityEngine.UI;
 [CreateAssetMenu(menuName = "Slime Settings/Display/Gradient")]
 public class GradientDisplayStrategy : DisplayStrategy
 {
+    protected override string KernelName => "Gradient";
+
     [Header("Shader Parameters")]
     public Color primaryColor = Color.green;
     public Color secondaryColor = Color.blue;

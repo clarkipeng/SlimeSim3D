@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
   - component: {fileID: 178986027}
+  - component: {fileID: 178986028}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -189,7 +190,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 178986024}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfed1c6ce4d1c4aeca2ec86c4d9f998f, type: 3}
   m_Name: 
@@ -205,6 +206,38 @@ MonoBehaviour:
   startPitch: 0
   startRadius: 10
   endRadius: 1
+--- !u!114 &178986028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7c888bde88d4f4f838cd35e93148bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  orbitCamera: {fileID: 963194229}
+  activeSettings: {fileID: 11400000, guid: 18b519f9fb6e54568817297da041b2fc, type: 2}
+  playOnStart: 1
+  loop: 0
+  timeline:
+  - {fileID: 11400000, guid: bb3449bede6a04a1f92d1b9ad6075f0d, type: 2}
+  - {fileID: 11400000, guid: 1c376326c3cbc4e099468f82a29fabb6, type: 2}
+  - {fileID: 11400000, guid: 87f78fe03efad4dad8c463dadc5dcc2d, type: 2}
+  - {fileID: 11400000, guid: 35c9554b31927486187472982ad7e7fe, type: 2}
+  - {fileID: 11400000, guid: 30c6cd755a1d54efdb3f7e2e12fe30d4, type: 2}
+  - {fileID: 11400000, guid: eae9b84c9b9224575b73cfce5a2d3986, type: 2}
+  - {fileID: 11400000, guid: e8d92c1614017421bb44bf04b90dfe84, type: 2}
+  - {fileID: 11400000, guid: cfda11d062b9d4feb88a073af51d785e, type: 2}
+  - {fileID: 11400000, guid: 1c12ec1392eff4f22832f9c525e6a7f0, type: 2}
+  - {fileID: 11400000, guid: e1997d0ab08ef41488b60c61c0b286cc, type: 2}
+  - {fileID: 11400000, guid: f9bd241907ee849e89588aa2ad36bda7, type: 2}
+  - {fileID: 11400000, guid: 8a91a0b5e7e7442e9b20e778dc27fd11, type: 2}
+  - {fileID: 11400000, guid: f0d78e94609c84552947f3266e46d359, type: 2}
+  - {fileID: 11400000, guid: bf0a6bbd2dc904303a9c34d34cf94add, type: 2}
+  - {fileID: 11400000, guid: 6cd2356f2d3a243f797c961858c43c10, type: 2}
 --- !u!1 &506224650
 GameObject:
   m_ObjectHideFlags: 0
@@ -391,6 +424,7 @@ MonoBehaviour:
   radius: 10
   yaw: 0
   pitch: 0
+  enableInput: 1
   gizmoColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &1066109336
 GameObject:

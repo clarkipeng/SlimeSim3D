@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
+  m_Name: Pos6Col6
+  m_EditorClassIdentifier: 
+  duration: 5
+  holdTime: 0
+  easing: 2
+  yaw: 248.50002
+  pitch: 8.749997
+  radius: 1.9399995
+  displaySettings: {fileID: 3665349101662233381}
+--- !u!114 &3665349101662233381
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
+  m_Name: Shot_6_Settings
+  m_EditorClassIdentifier: 
+  shader: {fileID: 7200000, guid: 8ddeba4f3e71a49cdb1766c8541eeedd, type: 3}
+  colorLow: {r: 0.02180794, g: 0, b: 0.9245283, a: 1}
+  colorMid: {r: 0, g: 1, b: 0.3258965, a: 1}
+  colorHigh: {r: 0, g: 0, b: 0, a: 1}
+  midThresh: 0.5
+  alphaScale: 1
+  alphaAmb: 0.00001

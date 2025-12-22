@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
   - component: {fileID: 178986027}
+  - component: {fileID: 178986028}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -170,12 +171,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   compute: {fileID: 7200000, guid: a0aea66b8c503e748bb334583d5db67c, type: 3}
-  settings: {fileID: 11400000, guid: 5f0e79561a30442fda7369bfe4a81292, type: 2}
+  settings: {fileID: 11400000, guid: 4520a3550ba264bc48c806d109dd04f8, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
-  displayStrategy: {fileID: 11400000, guid: 39d85ac25d80048e488a35f2a7ac9725, type: 2}
-  postProcess: 0
+  displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  postProcess: 1
   ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
@@ -205,6 +206,36 @@ MonoBehaviour:
   startPitch: 0
   startRadius: 10
   endRadius: 1
+--- !u!114 &178986028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7c888bde88d4f4f838cd35e93148bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  orbitCamera: {fileID: 963194229}
+  activeSettings: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  playOnStart: 1
+  loop: 0
+  timeline:
+  - {fileID: 11400000, guid: b5e8f656018f44a10977a2faa887c00a, type: 2}
+  - {fileID: 11400000, guid: 34203d1d0fed644708e8a9aa3b4c3933, type: 2}
+  - {fileID: 11400000, guid: d513cd6480fef4182b6fe2cb9bffa9bc, type: 2}
+  - {fileID: 11400000, guid: ba9402e6a989e4e77abb110e870bf5fd, type: 2}
+  - {fileID: 11400000, guid: d3e70a1fd11a643ff9da952734966734, type: 2}
+  - {fileID: 11400000, guid: c333cafa735a44cf8999323c2cd949c6, type: 2}
+  - {fileID: 11400000, guid: 0922ea11336974328aa74b425d0f77ed, type: 2}
+  - {fileID: 11400000, guid: 5a153e7a06bc24c94a4462029d5e57ee, type: 2}
+  - {fileID: 11400000, guid: 67039ca87b3124ec38aafa6e047cc18a, type: 2}
+  - {fileID: 11400000, guid: 268f2f7661d214fcbb1e9735694d3646, type: 2}
+  - {fileID: 11400000, guid: 7666aac983e454f44ba62fd27016cd7a, type: 2}
+  - {fileID: 11400000, guid: 75fb90e82089c4d668465ef9b9903056, type: 2}
+  - {fileID: 11400000, guid: e8e32f6aa154440f19829177b6210e22, type: 2}
 --- !u!1 &506224650
 GameObject:
   m_ObjectHideFlags: 0

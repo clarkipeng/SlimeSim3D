@@ -4,6 +4,8 @@ using ComputeShaderUtility;
 [CreateAssetMenu(menuName = "Slime Settings/Display/Default")]
 public class DefaultDisplayStrategy : DisplayStrategy
 {
+    protected override string KernelName => "Default";
+
     [Header("Shader Parameters")]
     public Color color = Color.green;
 

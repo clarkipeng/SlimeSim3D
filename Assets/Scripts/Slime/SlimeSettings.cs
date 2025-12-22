@@ -29,5 +29,6 @@ public class SlimeSettings : ScriptableObject
 		[Header("Sensor Settings")]
 		public float sensorAngleSpacing;
 		public float sensorOffsetDst;
+		public int sensorSize;
 	}
 }

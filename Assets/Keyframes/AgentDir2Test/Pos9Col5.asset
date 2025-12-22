@@ -9,8 +9,27 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
+  m_Name: Pos9Col5
+  m_EditorClassIdentifier: 
+  duration: 5
+  holdTime: 0
+  easing: 2
+  yaw: -119.75001
+  pitch: -21.875
+  radius: 1
+  displaySettings: {fileID: 3816718092765055353}
+--- !u!114 &3816718092765055353
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8e4a7ebbaef604ae2a16dc4f4706837d, type: 3}
-  m_Name: AgentDirection2
+  m_Name: Shot_9_Settings
   m_EditorClassIdentifier: 
   shader: {fileID: 7200000, guid: 9d6969cce8474ed4899115f5d816b0a5, type: 3}
   width: 1

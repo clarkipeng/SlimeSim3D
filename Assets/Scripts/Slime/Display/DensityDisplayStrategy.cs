@@ -7,10 +7,15 @@ using UnityEngine.UI;
 [CreateAssetMenu(menuName = "Slime Settings/Display/Density")]
 public class DensityDisplayStrategy : DisplayStrategy
 {
+    protected override string KernelName => "Density";
+
     [Header("Shader Parameters")]
     public Color colorLow = Color.blue;
     public Color colorMid = Color.red;
     public Color colorHigh = Color.white;
+
+    [Range(0.0f, 1.0f)]
+    public float midThresh = 0.5f;
 
     [Range(0.5f, 5)]
     public float alphaScale = 1.0f;
@@ -38,6 +43,7 @@ public class DensityDisplayStrategy : DisplayStrategy
         shader.SetVector("colorMid", colorMid);
         shader.SetVector("colorHigh", colorHigh);
 
+        shader.SetFloat("midThresh", midThresh);
         shader.SetFloat("alphaScale", alphaScale);
         shader.SetFloat("alphaAmb", alphaAmb);
 

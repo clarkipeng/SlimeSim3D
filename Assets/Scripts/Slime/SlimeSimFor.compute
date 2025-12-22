@@ -8,6 +8,7 @@ float time;
 half moveSpeed;
 half turnSpeed;
 half sensorOffsetDst;
+uint sensorSize;
 half cosAngle;
 half sinAngle;
 
@@ -18,7 +19,7 @@ int boundaryRadius;
 
 half trailWeight;
 
-Texture3D<half> ReadTrailMap; 
+Texture3D<float> ReadTrailMap; 
 SamplerState samplerReadTrailMap;
 RWTexture3D<float> WriteTrailMap;
 
@@ -48,8 +49,24 @@ half sense(Agent agent, float3 sensorDir) {
 	if (any(sensorPos < 0) || any(sensorPos >= resolution)) {
         return 0;
     }
-    float3 uv = (sensorPos + 0.5) * invSize;
-    return ReadTrailMap.SampleLevel(samplerReadTrailMap, uv, 0);
+    // float3 uv = (sensorPos + 0.5) * invSize;
+
+    // return ReadTrailMap.SampleLevel(samplerReadTrailMap, uv, 0);
+    int3 pos = int3(sensorPos);
+
+    half sum = 0.0h;
+    int size = sensorSize-1;
+
+    for (int dx = -size; dx<=size; dx++){
+        for (int dy = -size; dy <= size; dy++){
+            for (int dz = -size; dz <= size; dz++){
+                int3 samplePos = pos + int3(dx, dy, dz);
+                samplePos = clamp(samplePos, 0, resolution - 1);
+                sum += ReadTrailMap.Load(int4(samplePos, 0));
+            }
+        }
+    }
+    return sum;// / (sensorSize * sensorSize);
 }
 
 [numthreads(256,1,1)]
@@ -72,26 +89,44 @@ void Update (uint3 id : SV_DispatchThreadID)
 	half weightDown    = sense(agent, agent.direction * cosAngle + agentUp * -sinAngle);
 	half weightUp      = sense(agent, agent.direction * cosAngle + agentUp * sinAngle);
 
-	half maxWeightRadial = max(max(weightLeft, weightRight), max(weightUp, weightDown));
-	half minWeightRadial = min(min(weightLeft, weightRight), min(weightUp, weightDown));
-	
-	float rand = NextFloat(agent.rngState);
-
-	if (weightForward >= maxWeightRadial) {
-	}
-	else if (weightForward < minWeightRadial || maxWeightRadial == minWeightRadial) {
-		float r1 = NextFloat(agent.rngState);
-		float r2 = NextFloat(agent.rngState);
-		float r3 = NextFloat(agent.rngState);
-
-		float3 randomDir = (rand - r2) *  agentRight + (r3 - r1) * agentUp;
-    	agent.direction += randomDir * turnSpeed;
-	}
-	else if (weightRight == maxWeightRadial) agent.direction += agentRight * turnSpeed * rand;
-	else if (weightLeft  == maxWeightRadial) agent.direction -= agentRight * turnSpeed * rand;
-	else if (weightUp    == maxWeightRadial) agent.direction += agentUp * turnSpeed * rand;
-	else if (weightDown  == maxWeightRadial) agent.direction -= agentUp * turnSpeed * rand;
-
+	half totalWeight = weightForward + weightLeft + weightRight + weightDown + weightUp;
+    half maxWeight = max(max(weightLeft,weightRight), max(weightUp,weightDown));
+    half minWeight = min(min(weightLeft,weightRight), min(weightUp,weightDown));
+    
+    if (weightForward > maxWeight || minWeight == maxWeight)
+    {
+    }
+    else 
+    {
+        float randomPick = NextFloat(agent.rngState) * totalWeight;
+        float randomSteer = NextFloat(agent.rngState);
+        
+        if ((randomPick -= weightForward) < 0) 
+        {
+        }
+        else if ((randomPick -= weightLeft) < 0) 
+        {
+            agent.direction -= agentRight * turnSpeed * randomSteer;
+        }
+        else if ((randomPick -= weightRight) < 0) 
+        {
+            agent.direction += agentRight * turnSpeed * randomSteer;
+        }
+        else if ((randomPick -= weightDown) < 0) 
+        {
+            agent.direction -= agentUp * turnSpeed * randomSteer;
+        }
+        else if ((randomPick -= weightUp) < 0)
+        {
+            agent.direction += agentUp * turnSpeed * randomSteer;
+        }
+        else {
+            float r1 = NextFloat(agent.rngState);
+            float r2 = NextFloat(agent.rngState);
+            float3 randomDir = (0.5f - r1) * agentRight + (0.5f - r2) * agentUp;
+            agent.direction += randomDir * turnSpeed;
+        }
+    }
 	agent.direction = normalize(agent.direction);
 	float3 newPos = agent.position + agent.direction * deltaTime * moveSpeed;
 
@@ -125,7 +160,7 @@ void Update (uint3 id : SV_DispatchThreadID)
         agent.direction = normalize(randDir);
     }
 
-	WriteTrailMap[int3(newPos)] += trailWeight;
+	WriteTrailMap[int3(newPos)] = ReadTrailMap.Load(int4(newPos, 0)) + trailWeight;
 	
 	agent.position = newPos;
 	agents[id.x] = agent;
