@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEditor.Recorder;
+using UnityEditor.Recorder.Input;
+using UnityEditor.Recorder.Encoder;
 
 public class CinematicSequencer : MonoBehaviour
 {
@@ -12,6 +15,7 @@ public class CinematicSequencer : MonoBehaviour
 
     [Header("Sequence")]
     public bool playOnStart = false;
+    public bool recordOnStart = false;
     public bool loop = false;
     public List<KeyFrame> timeline = new List<KeyFrame>();
 
@@ -22,9 +26,13 @@ public class CinematicSequencer : MonoBehaviour
     private List<FieldInfo> intFields = new List<FieldInfo>();
     private List<FieldInfo> colorFields = new List<FieldInfo>();
 
+    private string sceneName;
+    private RecorderController recorderController;
+
     void Start()
     {
         if (activeSettings == null) return;
+        sceneName = SceneManager.GetActiveScene().name; ;
 
         System.Type type = activeSettings.GetType();
         foreach (var f in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
@@ -40,6 +48,7 @@ public class CinematicSequencer : MonoBehaviour
 
         if (playOnStart && timeline.Count > 0)
         {
+            PlaySequence(recordOnStart);
             StartCoroutine(RunSequence());
         }
     }
@@ -47,7 +56,18 @@ public class CinematicSequencer : MonoBehaviour
     [ContextMenu("Play Sequence")]
     public void PlaySequence()
     {
+        PlaySequence(true);
+    }
+    private void PlaySequence(bool shouldRecord = true)
+    {
         StopAllCoroutines();
+#if UNITY_EDITOR
+        StopRecording();
+        if (shouldRecord)
+        {
+            StartRecording();
+        }
+#endif
         StartCoroutine(RunSequence());
     }
 
@@ -98,7 +118,21 @@ public class CinematicSequencer : MonoBehaviour
             CopySettings(activeSettings, tempStartSettings);
 
             index++;
-            if (index >= timeline.Count && loop) index = 0;
+            if (index >= timeline.Count)
+            {
+                if (loop)
+                {
+                    index = 0;
+                }
+                else
+                {
+                    orbitCamera.Enable();
+#if UNITY_EDITOR
+                    StopRecording();
+#endif
+                    yield break;
+                }
+            }
         }
 
         orbitCamera.Enable();
@@ -155,7 +189,6 @@ public class CinematicSequencer : MonoBehaviour
     {
         if (orbitCamera == null) { Debug.LogError("Assign OrbitCamera!"); return; }
 
-        string sceneName = SceneManager.GetActiveScene().name;
         string folderPath = $"Assets/Keyframes/{sceneName}";
 
         if (!System.IO.Directory.Exists(folderPath))
@@ -200,6 +233,58 @@ public class CinematicSequencer : MonoBehaviour
         Debug.Log($"<color=green>Saved Shot:</color> {fullPath}");
 
         timeline.Add(shot);
+    }
+    public void StartRecording()
+    {
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        var recorderSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+
+        recorderSettings.name = "My Recorder";
+        recorderSettings.Enabled = true;
+
+        var encoderSettings = new CoreEncoderSettings
+        {
+            EncodingQuality = CoreEncoderSettings.VideoEncodingQuality.High,
+            // Format = CoreEncoderSettings.VideoEncoderOutputFormat.MP4
+        };
+        recorderSettings.EncoderSettings = encoderSettings;
+
+        recorderSettings.ImageInputSettings = new GameViewInputSettings
+        {
+            OutputWidth = 3840,
+            OutputHeight = 2160
+        };
+
+        string baseFolder = System.IO.Path.Combine(Application.dataPath, "../Recordings");
+        if (!System.IO.Directory.Exists(baseFolder)) System.IO.Directory.CreateDirectory(baseFolder);
+
+        int tryCnt = 0;
+        while (System.IO.File.Exists(System.IO.Path.Combine(baseFolder, $"{sceneName}_{tryCnt}.mp4")))
+        {
+            tryCnt++;
+        }
+        recorderSettings.OutputFile = System.IO.Path.Combine(baseFolder, $"{sceneName}_{tryCnt}.mp4");
+
+        controllerSettings.AddRecorderSettings(recorderSettings);
+        controllerSettings.SetRecordModeToManual();
+        controllerSettings.FrameRate = 60.0f;
+
+        RecorderOptions.VerboseMode = false;
+
+        recorderController = new RecorderController(controllerSettings);
+        recorderController.PrepareRecording();
+        recorderController.StartRecording();
+
+        Debug.Log($"Started Recording to: {recorderSettings.OutputFile}");
+    }
+    public void StopRecording()
+    {
+        if (recorderController != null && recorderController.IsRecording())
+        {
+            recorderController.StopRecording();
+            Debug.Log("Stopped Recording.");
+        }
+        recorderController = null;
     }
 #endif
 }

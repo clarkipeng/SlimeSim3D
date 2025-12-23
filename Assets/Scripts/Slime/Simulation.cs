@@ -150,6 +150,8 @@ public class Simulation : MonoBehaviour
 	{
 		if (displayTexture.width != Screen.width || displayTexture.height != Screen.height)
 		{
+			// ComputeHelper.Release(displayTexture);
+			displayTexture.Release();
 			ComputeHelper.CreateRenderTexture(ref displayTexture, Screen.width, Screen.height, filterMode, format);
 			outputImage.texture = displayTexture;
 		}
