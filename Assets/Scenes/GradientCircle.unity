@@ -235,6 +235,7 @@ GameObject:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
   - component: {fileID: 178986027}
+  - component: {fileID: 178986028}
   m_Layer: 0
   m_Name: Simulation
   m_TagString: Untagged
@@ -272,17 +273,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   compute: {fileID: 7200000, guid: a8be0a652e26249f1a4bb727a764f684, type: 3}
-  settings: {fileID: 11400000, guid: 9a26b7617bf014d418bfc4cc8c55e650, type: 2}
+  settings: {fileID: 11400000, guid: 53989276f75db4e5e9a3a17d6a0f61bd, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
-  displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  useFixedResolution: 0
+  fixedResolution: {x: 3840, y: 2160}
+  displayStrategy: {fileID: 11400000, guid: 9cefa82b052f94260891560824303abe, type: 2}
   postProcess: 0
   ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}
-  outputImage: {fileID: 0}
+  outputImage: {fileID: 736845271}
   camera: {fileID: 963194227}
 --- !u!114 &178986027
 MonoBehaviour:
@@ -307,6 +310,31 @@ MonoBehaviour:
   startPitch: 0
   startRadius: 10
   endRadius: 1
+--- !u!114 &178986028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7c888bde88d4f4f838cd35e93148bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  orbitCamera: {fileID: 963194229}
+  simulation: {fileID: 178986026}
+  playOnStart: 1
+  recordOnStart: 0
+  loop: 0
+  fps: 60
+  timeline:
+  - {fileID: 11400000, guid: 789422d33f82c45d79e525d889b26d86, type: 2}
+  - {fileID: 11400000, guid: d2fe3ce90b99f4e8c8a72b2501d8079c, type: 2}
+  - {fileID: 11400000, guid: d0a656ee851074a1cae28a45d5c45413, type: 2}
+  - {fileID: 11400000, guid: 239562bba14a04359866b28437c540b2, type: 2}
+  - {fileID: 11400000, guid: c81b568a08a3e4e60806f9d3de9e1c78, type: 2}
+  - {fileID: 11400000, guid: f451e3ed603374c219647051d71d0f8a, type: 2}
 --- !u!1 &736845269
 GameObject:
   m_ObjectHideFlags: 0

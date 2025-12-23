@@ -9,12 +9,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2e3a152f9d5c4635ad62c044b708c56, type: 3}
-  m_Name: Gradient
+  m_Script: {fileID: 11500000, guid: c3fd75bb22473434297b0b72bcc8da1f, type: 3}
+  m_Name: Isosurface
   m_EditorClassIdentifier: 
   shader: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
-  primaryColor: {r: 1, g: 1, b: 1, a: 1}
-  secondaryColor: {r: 0, g: 0.017493963, b: 1, a: 1}
+  surfaceThreshold: 0.08
+  lightAmb: 0.4
+  shinyness: 1
+  lightDir: {x: 0, y: -1, z: 1}
+  lightColor: {r: 1, g: 0.77873516, b: 0, a: 0}
+  primaryColor: {r: 1, g: 0.059297085, b: 0, a: 1}
+  secondaryColor: {r: 0.057249546, g: 0, b: 1, a: 1}
   alphaScale: 1
   alphaAmb: 0.00001
-  slicePlane: {x: 0, y: 0, z: 1, w: -1}
+  slicePlane: {x: 0, y: 0, z: 0, w: 0}

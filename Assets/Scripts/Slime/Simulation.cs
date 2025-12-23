@@ -20,6 +20,10 @@ public class Simulation : MonoBehaviour
 	public GraphicsFormat format = ComputeHelper.defaultGraphicsFormat;
 	public GraphicsFormat volumeFormat = GraphicsFormat.R8_UNorm;
 
+	[Header("Resolution Settings")]
+	public bool useFixedResolution = false;
+	public Vector2Int fixedResolution = new Vector2Int(3840, 2160);
+
 	[Header("Display Strategy")]
 	public DisplayStrategy displayStrategy;
 
@@ -44,13 +48,21 @@ public class Simulation : MonoBehaviour
 		outputImage.texture = displayTexture;
 	}
 
+	int GetRenderWidth()
+	{
+		return useFixedResolution ? fixedResolution.x : Screen.width;
+	}
+	int GetRenderHeight()
+	{
+		return useFixedResolution ? fixedResolution.y : Screen.height;
+	}
 
 	public void Init()
 	{
 		ComputeHelper.CreateRenderTexture(ref trailMap, settings.resolution, settings.resolution, settings.resolution, filterMode, volumeFormat);
 		ComputeHelper.CreateRenderTexture(ref diffusedTrailMap, settings.resolution, settings.resolution, settings.resolution, filterMode, volumeFormat);
 
-		ComputeHelper.CreateRenderTexture(ref displayTexture, Screen.width, Screen.height, filterMode, format);
+		ComputeHelper.CreateRenderTexture(ref displayTexture, GetRenderWidth(), GetRenderHeight(), filterMode, format);
 
 		updateKernel = compute.FindKernel("Update");
 		diffuseMapKernel = compute.FindKernel("Diffuse");
@@ -148,11 +160,11 @@ public class Simulation : MonoBehaviour
 
 	void LateUpdate()
 	{
-		if (displayTexture.width != Screen.width || displayTexture.height != Screen.height)
+		if (displayTexture.width != GetRenderWidth() || displayTexture.height != GetRenderHeight())
 		{
 			// ComputeHelper.Release(displayTexture);
 			displayTexture.Release();
-			ComputeHelper.CreateRenderTexture(ref displayTexture, Screen.width, Screen.height, filterMode, format);
+			ComputeHelper.CreateRenderTexture(ref displayTexture, GetRenderWidth(), GetRenderHeight(), filterMode, format);
 			outputImage.texture = displayTexture;
 		}
 		displayStrategy.Dispatch(

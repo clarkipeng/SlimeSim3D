@@ -169,10 +169,6 @@ void Default (uint3 id : SV_DispatchThreadID)
 #pragma kernel Gradient
 
 float4 frontColor, backColor;
-// float threshold;
-
-// static float3 lightDir = normalize(float3(-1, 1, -1));
-// static float shadowStrength = 2.0;
 
 float3 GetGradientColor(float t)
 {
@@ -326,4 +322,84 @@ void Density (uint3 id : SV_DispatchThreadID)
     Ray ray = CreateCameraRay(uv);
     float3 result = TraceDensity(ray, uv);
     Result[id.xy] = float4(result, 1.0f);
+}
+
+#pragma kernel Isosurface
+
+float surfaceThreshold; // e.g., 0.1
+float shinyness;
+
+float lightAmb;
+float3 lightDir;        // e.g., normalize(float3(1, 1, -1))
+float4 lightColor;   // e.g., float3(1, 1, 1)
+
+// float4 frontColor, backColor;
+
+float3 CalculateNormal(float3 p)
+{
+    float eps = 1.0 / resolution;
+    // float d = TrailMap.SampleLevel(samplerTrailMap, p, 0);
+    
+    // Central differences to find the direction of change
+    float3 n;
+    n.x = TrailMap.SampleLevel(samplerTrailMap, float3(p.x - eps, p.y, p.z), 0) - 
+          TrailMap.SampleLevel(samplerTrailMap, float3(p.x + eps, p.y, p.z), 0);
+    n.y = TrailMap.SampleLevel(samplerTrailMap, float3(p.x, p.y - eps, p.z), 0) - 
+          TrailMap.SampleLevel(samplerTrailMap, float3(p.x, p.y + eps, p.z), 0);
+    n.z = TrailMap.SampleLevel(samplerTrailMap, float3(p.x, p.y, p.z - eps), 0) - 
+          TrailMap.SampleLevel(samplerTrailMap, float3(p.x, p.y, p.z + eps), 0);
+          
+    return normalize(n);
+}
+
+float3 TraceIsosurface(Ray ray, float2 uv)
+{
+    float tin, tout;
+    if (!IntersectBounds(ray.origin, ray.direction, tin, tout)) return 0;
+    
+    float3 pos = ray.origin + ray.direction * tin + 0.5f;
+    float stepSize = 1.0 / resolution * 0.5; // Smaller steps for solids
+    float3 stepVec = ray.direction * stepSize;
+    int maxSteps = int((tout - tin) / stepSize);
+
+    for(int i = 0; i < maxSteps; i++)
+    {
+        if (any(pos < 0) || any(pos > 1)) break;
+        
+        float density = TrailMap.SampleLevel(samplerTrailMap, pos, 0);
+        
+        // HIT DETECTED
+        if (density > surfaceThreshold)
+        {
+            float3 normal = CalculateNormal(pos);
+
+            // 1. Diffuse Lighting
+            float diff = max(0, dot(normal, lightDir));
+
+            // 2. Specular Lighting
+            float3 viewDir = -ray.direction;
+            float3 reflectDir = reflect(-lightDir, normal);
+            float spec = 0;
+            if (dot(normal, lightDir) > 0){
+                spec = pow(max(0, dot(viewDir, reflectDir)), shinyness);
+            }
+
+            // 3. Calculate Color
+            float radiusSq = dot(pos - 0.5, pos - 0.5) * 4;
+            float t = sqrt(radiusSq);
+            float3 objectColor = GetGradientColor(t);
+
+            return objectColor * (diff + lightAmb) + (lightColor.rgb * spec);
+        }
+        pos += stepVec;
+    }
+    return 0; // Missed
+}
+
+[numthreads(8,8,1)]
+void Isosurface (uint3 id : SV_DispatchThreadID) {
+    uint w, h; Result.GetDimensions(w, h);
+    float2 uv = (id.xy + 0.5f) / float2(w,h) * 2.0f - 1.0f;
+    Ray ray = CreateCameraRay(uv);
+    Result[id.xy] = float4(TraceIsosurface(ray, uv), 1.0);
 }

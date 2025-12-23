@@ -11,12 +11,13 @@ public class CinematicSequencer : MonoBehaviour
 {
     [Header("References")]
     public OrbitCamera orbitCamera;
-    public DisplayStrategy activeSettings;
+    public Simulation simulation;
 
     [Header("Sequence")]
     public bool playOnStart = false;
     public bool recordOnStart = false;
     public bool loop = false;
+    public float fps = 60;
     public List<KeyFrame> timeline = new List<KeyFrame>();
 
     private DisplayStrategy tempStartSettings;
@@ -27,11 +28,13 @@ public class CinematicSequencer : MonoBehaviour
     private List<FieldInfo> colorFields = new List<FieldInfo>();
 
     private string sceneName;
+    private float prevFixedDeltaTime;
     private RecorderController recorderController;
+    private DisplayStrategy activeSettings;
 
     void Start()
     {
-        if (activeSettings == null) return;
+        activeSettings = simulation.displayStrategy;
         sceneName = SceneManager.GetActiveScene().name; ;
 
         System.Type type = activeSettings.GetType();
@@ -96,7 +99,7 @@ public class CinematicSequencer : MonoBehaviour
 
                 float t = ApplyEasing(progress, target.easing);
 
-                orbitCamera.yaw = Mathf.LerpAngle(startYaw, target.yaw, t);
+                orbitCamera.yaw = Mathf.Lerp(startYaw, target.yaw, t);
                 orbitCamera.pitch = Mathf.Lerp(startPitch, target.pitch, t);
                 orbitCamera.radius = Mathf.Lerp(startRadius, target.radius, t);
 
@@ -254,6 +257,8 @@ public class CinematicSequencer : MonoBehaviour
             OutputWidth = 3840,
             OutputHeight = 2160
         };
+        simulation.useFixedResolution = true;
+        simulation.fixedResolution = new Vector2Int(3840, 2160);
 
         string baseFolder = System.IO.Path.Combine(Application.dataPath, "../Recordings");
         if (!System.IO.Directory.Exists(baseFolder)) System.IO.Directory.CreateDirectory(baseFolder);
@@ -267,7 +272,11 @@ public class CinematicSequencer : MonoBehaviour
 
         controllerSettings.AddRecorderSettings(recorderSettings);
         controllerSettings.SetRecordModeToManual();
-        controllerSettings.FrameRate = 60.0f;
+        controllerSettings.FrameRate = fps;
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+
+        prevFixedDeltaTime = Time.fixedDeltaTime;
+        Time.fixedDeltaTime = 1.0f / fps;
 
         RecorderOptions.VerboseMode = false;
 
@@ -285,6 +294,9 @@ public class CinematicSequencer : MonoBehaviour
             Debug.Log("Stopped Recording.");
         }
         recorderController = null;
+
+        simulation.useFixedResolution = false;
+        Time.fixedDeltaTime = prevFixedDeltaTime;
     }
 #endif
 }
