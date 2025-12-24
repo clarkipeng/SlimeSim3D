@@ -99,8 +99,8 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 # script meta files
-*.cs.meta
-*.meta
-*.compute.meta
+# *.cs.meta
+# *.meta
+# *.compute.meta
 
 .vscode/
