@@ -10,16 +10,16 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
-  m_Name: Pos7
+  m_Name: Pos10
   m_EditorClassIdentifier: 
-  duration: 20
+  duration: 10
   holdTime: 0
   easing: 2
   yaw: 0
   pitch: 0
-  radius: 1.0000001
-  displaySettings: {fileID: 8514182278556561275}
---- !u!114 &8514182278556561275
+  radius: 3.15
+  displaySettings: {fileID: 7461225360036630482}
+--- !u!114 &7461225360036630482
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -28,14 +28,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b832da9e7c93347a1862777aa98cb690, type: 3}
+  m_Script: {fileID: 11500000, guid: 8e4a7ebbaef604ae2a16dc4f4706837d, type: 3}
   m_Name: Shot_1_Settings
   m_EditorClassIdentifier: 
-  shader: {fileID: 7200000, guid: 85f735dc826a24053a2c270c205cfe8a, type: 3}
-  colorLow: {r: 0, g: 0, b: 1, a: 1}
-  colorMid: {r: 1, g: 0, b: 0, a: 1}
-  colorHigh: {r: 1, g: 1, b: 1, a: 1}
-  midThresh: 0.5
-  alphaScale: 1
-  alphaAmb: 0.00001
-  slicePlane: {x: 0, y: 0, z: 0, w: 0}
+  shader: {fileID: 7200000, guid: 9d6969cce8474ed4899115f5d816b0a5, type: 3}
+  width: 1
+  referenceDist: 1.25
+  palA: {x: 0.5, y: 0.5, z: 0.5}
+  palB: {x: 0.5, y: 0.5, z: 0.5}
+  palC: {x: 1, y: 1, z: 1}
+  palD: {x: -0.84, y: -0.32, z: 0.67}

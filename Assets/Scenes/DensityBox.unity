@@ -175,13 +175,15 @@ MonoBehaviour:
   filterMode: 0
   format: 48
   volumeFormat: 5
+  useFixedResolution: 0
+  fixedResolution: {x: 3840, y: 2160}
   displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
   postProcess: 1
   ppMaterial: {fileID: 2100000, guid: bec6c65bcc59746c18ee4ad2ac00fb16, type: 2}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}
-  outputImage: {fileID: 0}
+  outputImage: {fileID: 1391105517}
   camera: {fileID: 963194227}
 --- !u!114 &178986027
 MonoBehaviour:
@@ -219,10 +221,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   orbitCamera: {fileID: 963194229}
-  activeSettings: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
+  simulation: {fileID: 178986026}
   playOnStart: 1
   recordOnStart: 0
   loop: 0
+  fps: 60
   timeline:
   - {fileID: 11400000, guid: b5e8f656018f44a10977a2faa887c00a, type: 2}
   - {fileID: 11400000, guid: 34203d1d0fed644708e8a9aa3b4c3933, type: 2}

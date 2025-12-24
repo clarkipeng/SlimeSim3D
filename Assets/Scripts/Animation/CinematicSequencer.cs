@@ -28,7 +28,6 @@ public class CinematicSequencer : MonoBehaviour
     private List<FieldInfo> colorFields = new List<FieldInfo>();
 
     private string sceneName;
-    private float prevFixedDeltaTime;
     private RecorderController recorderController;
     private DisplayStrategy activeSettings;
 
@@ -186,6 +185,13 @@ public class CinematicSequencer : MonoBehaviour
         foreach (var f in intFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
         return true;
     }
+
+    void OnDisable()
+    {
+#if UNITY_EDITOR
+        StopRecording();
+#endif
+    }
 #if UNITY_EDITOR
     [ContextMenu("Snapshot Keyframe")]
     public void SnapshotKeyframe()
@@ -255,7 +261,7 @@ public class CinematicSequencer : MonoBehaviour
         recorderSettings.ImageInputSettings = new GameViewInputSettings
         {
             OutputWidth = 3840,
-            OutputHeight = 2160
+            OutputHeight = 2160,
         };
         simulation.useFixedResolution = true;
         simulation.fixedResolution = new Vector2Int(3840, 2160);
@@ -275,9 +281,6 @@ public class CinematicSequencer : MonoBehaviour
         controllerSettings.FrameRate = fps;
         controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
 
-        prevFixedDeltaTime = Time.fixedDeltaTime;
-        Time.fixedDeltaTime = 1.0f / fps;
-
         RecorderOptions.VerboseMode = false;
 
         recorderController = new RecorderController(controllerSettings);
@@ -296,7 +299,6 @@ public class CinematicSequencer : MonoBehaviour
         recorderController = null;
 
         simulation.useFixedResolution = false;
-        Time.fixedDeltaTime = prevFixedDeltaTime;
     }
 #endif
 }
