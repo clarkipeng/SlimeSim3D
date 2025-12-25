@@ -158,11 +158,12 @@ void Update (uint3 id : SV_DispatchThreadID)
 		float r4 = NextFloat(agent.rngState);
 		float r5 = NextFloat(agent.rngState);
 		float r6 = NextFloat(agent.rngState);
-        float3 randDir = float3(r1-r4,r2-r5,r3-r5) - 0.5f;
+        float3 randDir = float3(r1-r4,r2-r5,r3-r5);
 		if (outsideSphere && dot(offset, randDir) > 0.0f)
 		{
 			randDir = -randDir;
 		}
+        randDir += -agent.direction;
         agent.direction = normalize(randDir);
     }
 

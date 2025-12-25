@@ -325,7 +325,7 @@ MonoBehaviour:
   orbitCamera: {fileID: 963194229}
   simulation: {fileID: 178986026}
   playOnStart: 1
-  recordOnStart: 0
+  recordOnStart: 1
   loop: 0
   fps: 60
   timeline:

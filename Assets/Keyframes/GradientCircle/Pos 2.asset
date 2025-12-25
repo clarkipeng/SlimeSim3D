@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2b18c7638dfa648d38b6a474b2045ea8, type: 3}
   m_Name: Pos 2
   m_EditorClassIdentifier: 
-  duration: 25
+  duration: 10
   holdTime: 0
-  easing: 5
-  yaw: 360
+  easing: 1
+  yaw: 150
   pitch: 15
   radius: 1
   displaySettings: {fileID: 11400000, guid: ea421bf0587554cc0a14d0dfd823cef6, type: 2}

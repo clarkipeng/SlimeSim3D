@@ -13,15 +13,16 @@ MonoBehaviour:
   m_Name: SimA
   m_EditorClassIdentifier: 
   stepsPerFrame: 1
-  resolution: 300
-  boundaryRadius: 150
-  numAgents: 250000
-  spawnMode: 3
-  trailWeight: 5
-  decayRate: 0.2
-  diffuseRate: 3
+  resolution: 500
+  boundaryRadius: 1000
+  numAgents: 500000
+  spawnMode: 1
+  trailWeight: 0.01
+  decayRate: 0.05
+  diffuseRate: 2
   speciesSetting:
-    moveSpeed: 4
-    turnSpeed: 30
-    sensorAngleSpacing: 30
-    sensorOffsetDst: 8
+    moveSpeed: 30
+    turnSpeed: 90
+    sensorAngleSpacing: 15
+    sensorOffsetDst: 10
+    sensorSize: 2

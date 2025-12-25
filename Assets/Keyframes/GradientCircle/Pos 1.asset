@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   duration: 5
   holdTime: 0
-  easing: 2
+  easing: 1
   yaw: 0
   pitch: 0
   radius: 1

@@ -204,6 +204,7 @@ GameObject:
   m_Component:
   - component: {fileID: 178986025}
   - component: {fileID: 178986026}
+  - component: {fileID: 178986028}
   - component: {fileID: 178986027}
   m_Layer: 0
   m_Name: Simulation
@@ -241,18 +242,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0173053465a956443813261665491110, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  compute: {fileID: 7200000, guid: a0aea66b8c503e748bb334583d5db67c, type: 3}
-  settings: {fileID: 11400000, guid: 5f0e79561a30442fda7369bfe4a81292, type: 2}
+  compute: {fileID: 7200000, guid: a8be0a652e26249f1a4bb727a764f684, type: 3}
+  settings: {fileID: 11400000, guid: 17e98c20846d94d1db264dff24960cba, type: 2}
   filterMode: 0
   format: 48
   volumeFormat: 5
-  displayStrategy: {fileID: 11400000, guid: 39d85ac25d80048e488a35f2a7ac9725, type: 2}
+  useFixedResolution: 0
+  fixedResolution: {x: 3840, y: 2160}
+  displayStrategy: {fileID: 11400000, guid: e75ad0b1a6f6444fe8d3d3dd33909862, type: 2}
   postProcess: 0
   ppMaterial: {fileID: 0}
   trailMap: {fileID: 0}
   diffusedTrailMap: {fileID: 0}
   displayTexture: {fileID: 0}
-  outputImage: {fileID: 0}
+  outputImage: {fileID: 98795248}
   camera: {fileID: 963194227}
 --- !u!114 &178986027
 MonoBehaviour:
@@ -261,7 +264,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 178986024}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bfed1c6ce4d1c4aeca2ec86c4d9f998f, type: 3}
   m_Name: 
@@ -277,6 +280,27 @@ MonoBehaviour:
   startPitch: 0
   startRadius: 10
   endRadius: 1
+--- !u!114 &178986028
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 178986024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c7c888bde88d4f4f838cd35e93148bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  orbitCamera: {fileID: 963194229}
+  simulation: {fileID: 178986026}
+  playOnStart: 1
+  recordOnStart: 1
+  loop: 0
+  fps: 60
+  timeline:
+  - {fileID: 11400000, guid: 266611589876ff44bb4b6fe8f46d3802, type: 2}
+  - {fileID: 11400000, guid: f2a170379d5cab945ae596b6edd71c64, type: 2}
 --- !u!1 &963194225
 GameObject:
   m_ObjectHideFlags: 0

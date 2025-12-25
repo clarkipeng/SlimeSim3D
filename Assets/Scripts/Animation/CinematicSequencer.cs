@@ -20,6 +20,10 @@ public class CinematicSequencer : MonoBehaviour
     public float fps = 60;
     public List<KeyFrame> timeline = new List<KeyFrame>();
 
+    [Header("Resolution")]
+    public int renderWidth = 2560;
+    public int renderHeight = 1440;
+
     private DisplayStrategy tempStartSettings;
     private List<FieldInfo> floatFields = new List<FieldInfo>();
     private List<FieldInfo> vec3Fields = new List<FieldInfo>();
@@ -34,7 +38,7 @@ public class CinematicSequencer : MonoBehaviour
     void Start()
     {
         activeSettings = simulation.displayStrategy;
-        sceneName = SceneManager.GetActiveScene().name; ;
+        sceneName = SceneManager.GetActiveScene().name;
 
         System.Type type = activeSettings.GetType();
         foreach (var f in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
@@ -56,22 +60,115 @@ public class CinematicSequencer : MonoBehaviour
     }
 
     [ContextMenu("Play Sequence")]
-    public void PlaySequence()
-    {
-        PlaySequence(true);
-    }
+    public void PlaySequence() => PlaySequence(true);
+
     private void PlaySequence(bool shouldRecord = true)
     {
         StopAllCoroutines();
 #if UNITY_EDITOR
         StopRecording();
-        if (shouldRecord)
-        {
-            StartRecording();
-        }
+        if (shouldRecord) StartRecording();
 #endif
         StartCoroutine(RunSequence());
     }
+
+#if UNITY_EDITOR
+    [ContextMenu("Take Screenshot")]
+    public void TakeScreenshot()
+    {
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        var recorderSettings = ScriptableObject.CreateInstance<ImageRecorderSettings>();
+
+        recorderSettings.name = "Screenshot";
+        recorderSettings.Enabled = true;
+        recorderSettings.OutputFormat = ImageRecorderSettings.ImageRecorderOutputFormat.PNG;
+        recorderSettings.CaptureAlpha = false;
+
+        SetupRecorderDefaults(recorderSettings, "Shot", "png");
+
+        recorderSettings.imageInputSettings = CreateInputSettings(); 
+
+        controllerSettings.AddRecorderSettings(recorderSettings);
+        controllerSettings.SetRecordModeToSingleFrame(0); 
+
+        var controller = new RecorderController(controllerSettings);
+        controller.PrepareRecording();
+        controller.StartRecording();
+
+        Debug.Log($"<color=cyan>Screenshot Saved:</color> {recorderSettings.OutputFile}.png");
+    }
+
+    public void StartRecording()
+    {
+        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
+        var recorderSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
+
+        recorderSettings.name = "Video Recorder";
+        recorderSettings.Enabled = true;
+
+        // var encoderSettings = new ProResEncoderSettings();
+        // encoderSettings.OutputFormat = ProResEncoderSettings.OutputFormat.ProRes422;
+        // recorderSettings.EncoderSettings = encoderSettings;
+        var encoderSettings = new CoreEncoderSettings
+        {
+            EncodingQuality = CoreEncoderSettings.VideoEncodingQuality.High,
+        };
+        recorderSettings.EncoderSettings = encoderSettings;
+
+        SetupRecorderDefaults(recorderSettings, "Video", "mov");
+
+        recorderSettings.ImageInputSettings = CreateInputSettings();
+
+        controllerSettings.AddRecorderSettings(recorderSettings);
+        controllerSettings.SetRecordModeToManual();
+        controllerSettings.FrameRate = fps;
+        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
+
+        RecorderOptions.VerboseMode = false;
+
+        recorderController = new RecorderController(controllerSettings);
+        recorderController.PrepareRecording();
+        recorderController.StartRecording();
+
+        Debug.Log($"Started Recording to: {recorderSettings.OutputFile}");
+    }
+
+    public void StopRecording()
+    {
+        if (recorderController != null && recorderController.IsRecording())
+        {
+            recorderController.StopRecording();
+            Debug.Log("Stopped Recording.");
+        }
+        recorderController = null;
+        simulation.useFixedResolution = false;
+    }
+
+    private GameViewInputSettings CreateInputSettings()
+    {
+        simulation.useFixedResolution = true;
+        simulation.fixedResolution = new Vector2Int(renderWidth, renderHeight);
+
+        return new GameViewInputSettings
+        {
+            OutputWidth = renderWidth,
+            OutputHeight = renderHeight,
+        };
+    }
+
+    private void SetupRecorderDefaults(RecorderSettings settings, string suffix, string ext)
+    {
+        string baseFolder = System.IO.Path.Combine(Application.dataPath, "../Recordings");
+        if (!System.IO.Directory.Exists(baseFolder)) System.IO.Directory.CreateDirectory(baseFolder);
+
+        int tryCnt = 0;
+        while (System.IO.File.Exists(System.IO.Path.Combine(baseFolder, $"{sceneName}_{suffix}_{tryCnt}.{ext}")))
+        {
+            tryCnt++;
+        }
+        settings.OutputFile = System.IO.Path.Combine(baseFolder, $"{sceneName}_{suffix}_{tryCnt}");
+    }
+#endif
 
     IEnumerator RunSequence()
     {
@@ -95,7 +192,6 @@ public class CinematicSequencer : MonoBehaviour
             {
                 timer += Time.deltaTime;
                 float progress = Mathf.Clamp01(timer / Mathf.Max(0.01f, target.duration));
-
                 float t = ApplyEasing(progress, target.easing);
 
                 orbitCamera.yaw = Mathf.Lerp(startYaw, target.yaw, t);
@@ -103,7 +199,6 @@ public class CinematicSequencer : MonoBehaviour
                 orbitCamera.radius = Mathf.Lerp(startRadius, target.radius, t);
 
                 InterpolateSettings(tempStartSettings, target.displaySettings, activeSettings, t);
-
                 yield return null;
             }
 
@@ -122,10 +217,7 @@ public class CinematicSequencer : MonoBehaviour
             index++;
             if (index >= timeline.Count)
             {
-                if (loop)
-                {
-                    index = 0;
-                }
+                if (loop) index = 0;
                 else
                 {
                     orbitCamera.Enable();
@@ -136,7 +228,6 @@ public class CinematicSequencer : MonoBehaviour
                 }
             }
         }
-
         orbitCamera.Enable();
     }
 
@@ -178,11 +269,11 @@ public class CinematicSequencer : MonoBehaviour
     private bool AreSettingsIdentical(DisplayStrategy source, DisplayStrategy dest)
     {
         if (source == null || dest == null) return false;
-        foreach (var f in floatFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
-        foreach (var f in vec3Fields) if (f.GetValue(dest) != f.GetValue(source)) return false;
-        foreach (var f in vec4Fields) if (f.GetValue(dest) != f.GetValue(source)) return false;
-        foreach (var f in colorFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
-        foreach (var f in intFields) if (f.GetValue(dest) != f.GetValue(source)) return false;
+        foreach (var f in floatFields) if (!f.GetValue(dest).Equals(f.GetValue(source))) return false;
+        foreach (var f in vec3Fields) if (!f.GetValue(dest).Equals(f.GetValue(source))) return false;
+        foreach (var f in vec4Fields) if (!f.GetValue(dest).Equals(f.GetValue(source))) return false;
+        foreach (var f in colorFields) if (!f.GetValue(dest).Equals(f.GetValue(source))) return false;
+        foreach (var f in intFields) if (!f.GetValue(dest).Equals(f.GetValue(source))) return false;
         return true;
     }
 
@@ -197,14 +288,8 @@ public class CinematicSequencer : MonoBehaviour
     public void SnapshotKeyframe()
     {
         if (orbitCamera == null) { Debug.LogError("Assign OrbitCamera!"); return; }
-
         string folderPath = $"Assets/Keyframes/{sceneName}";
-
-        if (!System.IO.Directory.Exists(folderPath))
-        {
-            System.IO.Directory.CreateDirectory(folderPath);
-            UnityEditor.AssetDatabase.Refresh();
-        }
+        if (!System.IO.Directory.Exists(folderPath)) { System.IO.Directory.CreateDirectory(folderPath); UnityEditor.AssetDatabase.Refresh(); }
 
         KeyFrame shot = ScriptableObject.CreateInstance<KeyFrame>();
         shot.name = "Shot_" + (timeline.Count + 1);
@@ -212,11 +297,9 @@ public class CinematicSequencer : MonoBehaviour
         bool createNewSetting = true;
         for (int prev = 0; prev < timeline.Count; prev++)
         {
-            var lastKeyframe = timeline[prev];
-            if (AreSettingsIdentical(lastKeyframe.displaySettings, activeSettings))
+            if (AreSettingsIdentical(timeline[prev].displaySettings, activeSettings))
             {
-                shot.displaySettings = lastKeyframe.displaySettings;
-                shot.displaySettings.name = "Shot_" + (prev + 1) + "_Settings";
+                shot.displaySettings = timeline[prev].displaySettings;
                 createNewSetting = false;
                 break;
             }
@@ -233,72 +316,11 @@ public class CinematicSequencer : MonoBehaviour
         shot.duration = 5.0f;
         shot.easing = KeyFrame.EasingType.SmootherStep;
 
-        string fileName = $"{shot.name}.asset";
-        string fullPath = $"{folderPath}/{fileName}";
-
+        string fullPath = $"{folderPath}/{shot.name}.asset";
         UnityEditor.AssetDatabase.CreateAsset(shot, fullPath);
         UnityEditor.AssetDatabase.AddObjectToAsset(shot.displaySettings, shot);
         UnityEditor.AssetDatabase.SaveAssets();
-        Debug.Log($"<color=green>Saved Shot:</color> {fullPath}");
-
         timeline.Add(shot);
-    }
-    public void StartRecording()
-    {
-        var controllerSettings = ScriptableObject.CreateInstance<RecorderControllerSettings>();
-        var recorderSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
-
-        recorderSettings.name = "My Recorder";
-        recorderSettings.Enabled = true;
-
-        var encoderSettings = new CoreEncoderSettings
-        {
-            EncodingQuality = CoreEncoderSettings.VideoEncodingQuality.High,
-            // Format = CoreEncoderSettings.VideoEncoderOutputFormat.MP4
-        };
-        recorderSettings.EncoderSettings = encoderSettings;
-
-        recorderSettings.ImageInputSettings = new GameViewInputSettings
-        {
-            OutputWidth = 3840,
-            OutputHeight = 2160,
-        };
-        simulation.useFixedResolution = true;
-        simulation.fixedResolution = new Vector2Int(3840, 2160);
-
-        string baseFolder = System.IO.Path.Combine(Application.dataPath, "../Recordings");
-        if (!System.IO.Directory.Exists(baseFolder)) System.IO.Directory.CreateDirectory(baseFolder);
-
-        int tryCnt = 0;
-        while (System.IO.File.Exists(System.IO.Path.Combine(baseFolder, $"{sceneName}_{tryCnt}.mp4")))
-        {
-            tryCnt++;
-        }
-        recorderSettings.OutputFile = System.IO.Path.Combine(baseFolder, $"{sceneName}_{tryCnt}.mp4");
-
-        controllerSettings.AddRecorderSettings(recorderSettings);
-        controllerSettings.SetRecordModeToManual();
-        controllerSettings.FrameRate = fps;
-        controllerSettings.FrameRatePlayback = FrameRatePlayback.Constant;
-
-        RecorderOptions.VerboseMode = false;
-
-        recorderController = new RecorderController(controllerSettings);
-        recorderController.PrepareRecording();
-        recorderController.StartRecording();
-
-        Debug.Log($"Started Recording to: {recorderSettings.OutputFile}");
-    }
-    public void StopRecording()
-    {
-        if (recorderController != null && recorderController.IsRecording())
-        {
-            recorderController.StopRecording();
-            Debug.Log("Stopped Recording.");
-        }
-        recorderController = null;
-
-        simulation.useFixedResolution = false;
     }
 #endif
 }

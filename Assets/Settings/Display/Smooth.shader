@@ -66,7 +66,7 @@ Shader "Hidden/Smooth"
                     }
                 }
 
-                if (length(c.rgb) > 0.1 && maxNeighbor < 0.1){
+                if (length(c.rgb) > 0.5 && maxNeighbor < 0.5){
                     return float4(0,0,0,1); 
                 }
 

@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: SimF
   m_EditorClassIdentifier: 
   stepsPerFrame: 3
-  resolution: 200
-  boundaryRadius: 100
-  numAgents: 500000
+  resolution: 400
+  boundaryRadius: 200
+  numAgents: 1000000
   spawnMode: 3
   trailWeight: 0.1
   decayRate: 0.1
