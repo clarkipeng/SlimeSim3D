@@ -1,0 +1,209 @@
+// Offline cover renderer: the Isosurface display kernel's shading, traced through a thin-lens
+// camera over a dark ground plane, accumulated over many jittered samples.
+#pragma kernel Trace
+#pragma kernel Resolve
+
+Texture3D<float> TrailMap;
+SamplerState samplerTrailMap;
+
+int resolution;
+int boundaryRadius;
+float4 slicePlane;
+
+// Camera (world space; the slime volume is the unit cube centred at the origin)
+float3 camPos, camFwd, camRight, camUp;
+float tanHalfFovY, aspect, focusDist, apertureRadius;
+
+// Isosurface shading (same parameters as IsosurfaceDisplayStrategy)
+float surfaceThreshold, shinyness, lightAmb;
+float3 lightDir; // towards the light, normalised
+float lightRadius; // soft-shadow cone (radians-ish)
+float keyIntensity;
+float4 lightColor, frontColor, backColor;
+float selfShadow; // 0 = project shading exactly, >0 darkens diffuse by volume occlusion
+
+// Ground and background
+float groundY;
+float4 groundColor;
+float groundGloss;
+float poolRadius;
+float4 bgColor;
+
+uint frameIndex;
+uint width, height;
+RWTexture2D<float4> Accum;
+
+// Resolve
+float exposure;
+float invSamples;
+float vignette;
+float tonemap;
+RWTexture2D<float4> Output;
+
+uint Hash(uint s)
+{
+    s ^= 2747636419u; s *= 2654435769u; s ^= s >> 16; s *= 2654435769u; s ^= s >> 16; s *= 2654435769u;
+    return s;
+}
+float Rand(inout uint s) { s = Hash(s); return s / 4294967295.0; }
+
+float3 Gradient(float t) { return lerp(frontColor.rgb, backColor.rgb, saturate(t)).rgb; }
+
+float Density(float3 p) { return TrailMap.SampleLevel(samplerTrailMap, p, 0); }
+
+bool Bounds(float3 ro, float3 rd, out float tmin, out float tmax)
+{
+    tmin = 0; tmax = 0;
+    float radius = (float)boundaryRadius / resolution;
+    float b = dot(ro, rd);
+    float c = dot(ro, ro) - radius * radius;
+    float h = b * b - c;
+    if (h < 0) return false;
+    h = sqrt(h);
+    tmin = -b - h; tmax = -b + h;
+    float3 inv = 1.0 / rd;
+    float3 t0 = (-0.5 - ro) * inv, t1 = (0.5 - ro) * inv;
+    float3 lo = min(t0, t1), hi = max(t0, t1);
+    tmin = max(tmin, max(max(lo.x, lo.y), lo.z));
+    tmax = min(tmax, min(min(hi.x, hi.y), hi.z));
+    if (dot(slicePlane.xyz, slicePlane.xyz) > 0)
+    {
+        float denom = dot(rd, slicePlane.xyz);
+        float d0 = dot(ro, slicePlane.xyz) + slicePlane.w;
+        if (abs(denom) > 1e-6)
+        {
+            float tp = -d0 / denom;
+            if (denom < 0) tmin = max(tmin, tp); else tmax = min(tmax, tp);
+        }
+        else if (d0 > 0) return false;
+    }
+    tmin = max(tmin, 0);
+    return tmax > tmin;
+}
+
+// First crossing of the isosurface along the ray; returns texture-space hit position.
+bool HitVolume(float3 ro, float3 rd, float jitter, out float tHit, out float3 p)
+{
+    tHit = 0; p = 0;
+    float tin, tout;
+    if (!Bounds(ro, rd, tin, tout)) return false;
+    float step = 0.5 / resolution;
+    float t = tin + jitter * step;
+    [loop] for (int i = 0; i < 4096 && t < tout; i++)
+    {
+        float3 q = ro + rd * t + 0.5;
+        if (Density(q) > surfaceThreshold)
+        {
+            float a = t - step, b = t;
+            [unroll] for (int k = 0; k < 5; k++)
+            {
+                float m = 0.5 * (a + b);
+                if (Density(ro + rd * m + 0.5) > surfaceThreshold) b = m; else a = m;
+            }
+            tHit = max(b, tin);
+            p = ro + rd * tHit + 0.5;
+            return true;
+        }
+        t += step;
+    }
+    return false;
+}
+
+// Fraction of key light reaching x (soft, via a cone-jittered occlusion ray).
+float LightVisibility(float3 x, float3 L, inout uint rng)
+{
+    float tH; float3 pH;
+    return HitVolume(x, L, Rand(rng), tH, pH) ? 0.0 : 1.0;
+}
+
+float3 Normal(float3 p)
+{
+    float e = 1.0 / resolution;
+    float3 n;
+    n.x = Density(p - float3(e, 0, 0)) - Density(p + float3(e, 0, 0));
+    n.y = Density(p - float3(0, e, 0)) - Density(p + float3(0, e, 0));
+    n.z = Density(p - float3(0, 0, e)) - Density(p + float3(0, 0, e));
+    return normalize(n + 1e-7);
+}
+
+float3 JitterDir(float3 L, inout uint rng)
+{
+    float3 t = normalize(cross(L, abs(L.y) < 0.99 ? float3(0, 1, 0) : float3(1, 0, 0)));
+    float3 b = cross(L, t);
+    float r = sqrt(Rand(rng)) * lightRadius, a = Rand(rng) * 6.2831853;
+    return normalize(L + (t * cos(a) + b * sin(a)) * r);
+}
+
+float3 ShadeSlime(float3 p, float3 rd, inout uint rng)
+{
+    float3 n = Normal(p);
+    float3 L = JitterDir(lightDir, rng);
+    float nl = dot(n, L);
+    float diff = max(0, nl) * keyIntensity;
+    float spec = nl > 0 ? pow(max(0, dot(-rd, reflect(-L, n))), shinyness) * keyIntensity : 0;
+    if (selfShadow > 0 && nl > 0)
+    {
+        float vis = LightVisibility(p - 0.5 + n * (2.0 / resolution), L, rng);
+        float k = lerp(1, vis, selfShadow);
+        diff *= k; spec *= k;
+    }
+    float3 obj = Gradient(sqrt(dot(p - 0.5, p - 0.5) * 4));
+    return obj * (diff + lightAmb) + lightColor.rgb * spec;
+}
+
+float3 Background(float3 rd) { return bgColor.rgb * (0.6 + 0.4 * saturate(rd.y * 3 + 0.5)); }
+
+float3 Radiance(float3 ro, float3 rd, inout uint rng)
+{
+    float tV; float3 pV;
+    bool hitV = HitVolume(ro, rd, Rand(rng), tV, pV);
+    float tG = rd.y < 0 ? (groundY - ro.y) / rd.y : 1e9;
+    if (hitV && tV < tG) return ShadeSlime(pV, rd, rng);
+    if (tG < 1e8)
+    {
+        float3 x = ro + rd * tG;
+        float3 L = JitterDir(lightDir, rng);
+        float vis = LightVisibility(x + float3(0, 1e-3, 0), L, rng);
+        float pool = exp(-dot(x.xz, x.xz) / (poolRadius * poolRadius));
+        float3 col = groundColor.rgb * (max(0, L.y) * keyIntensity * vis * pool + lightAmb * 0.25 * (0.4 + 0.6 * pool));
+        // Glossy ground: reflect the slime with Schlick fresnel.
+        float3 rr = reflect(rd, float3(0, 1, 0));
+        float tR; float3 pR;
+        float fres = 0.04 + 0.96 * pow(1 - saturate(-rd.y), 5);
+        if (groundGloss > 0 && HitVolume(x, rr, Rand(rng), tR, pR))
+            col += ShadeSlime(pR, rr, rng) * fres * groundGloss;
+        float fog = exp(-max(0, length(x.xz) - 1.0) * 0.35);
+        return lerp(Background(rd), col, fog);
+    }
+    return Background(rd);
+}
+
+[numthreads(8, 8, 1)]
+void Trace(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= width || id.y >= height) return;
+    uint rng = Hash(id.x * 1973u + id.y * 9277u + frameIndex * 26699u + 1u);
+    float2 uv = (id.xy + float2(Rand(rng), Rand(rng))) / float2(width, height) * 2 - 1;
+    float3 dir = normalize(camFwd + camRight * uv.x * tanHalfFovY * aspect + camUp * uv.y * tanHalfFovY);
+    // Thin lens: sample the aperture disk, aim at the focal plane.
+    float3 focus = camPos + dir * (focusDist / dot(dir, camFwd));
+    float r = sqrt(Rand(rng)) * apertureRadius, a = Rand(rng) * 6.2831853;
+    float3 ro = camPos + (camRight * cos(a) + camUp * sin(a)) * r;
+    float3 rd = normalize(focus - ro);
+    float3 c = Radiance(ro, rd, rng);
+    Accum[id.xy] += float4(c, 1);
+}
+
+float3 ACES(float3 x) { return saturate((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)); }
+float3 ToSRGB(float3 c) { return c <= 0.0031308 ? c * 12.92 : 1.055 * pow(c, 1 / 2.4) - 0.055; }
+
+[numthreads(8, 8, 1)]
+void Resolve(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= width || id.y >= height) return;
+    float3 c = Accum[id.xy].rgb * invSamples * exposure;
+    float2 uv = (id.xy + 0.5) / float2(width, height) * 2 - 1;
+    c *= 1 - vignette * dot(uv * float2(0.8, 1), uv * float2(0.8, 1)) * 0.5;
+    c = tonemap > 0.5 ? ACES(c) : c;
+    Output[id.xy] = float4(ToSRGB(saturate(c)), 1);
+}
