@@ -11,15 +11,16 @@ using UnityEngine.SceneManagement;
 // Headless frame capture of a running scene, started only by command-line arguments:
 //   Slime.exe -batchmode -capture C:/out [-scene Name] [-seconds 24] [-fps 30] [-size 1920x1080]
 //             [-orbit yaw,yawPerSecond,pitch,radius,fov] [-seed 3] [-fixedStep] [-speed 1] [-keyframe N]
-//             [-sim field=value;...] [-look field=value;...] [-warmup seconds]
+//             [-sim field=value;...] [-look field=value;...] [-warmup seconds] [-ramp speed,seconds]
 // Default is a live capture: the scene runs in real time and frames are read back at the capture
 // rate, stamped with wall-clock time, followed by a frame-time report and an uncapped benchmark.
 // With -fixedStep every frame advances exactly 1/fps of game time (times -speed) and is saved as
 // PNG, for masters whose timing must not depend on machine load; -warmup runs the sim that
-// long (in capture seconds) before the first saved frame. -keyframe shows the look of the
-// scene sequencer's Nth keyframe instead of playing the sequence. -sim and -look override fields of
-// copies of the simulation settings and the display strategy (e.g. -look "colorLow=0,0.2,0.3,1"),
-// so a look can be tried without touching the project's assets. The player quits when done.
+// long (in capture seconds) before the first saved frame; -ramp starts the sim at a higher speed
+// and eases it down to -speed over the first seconds, a whole number of steps every frame.
+// -keyframe shows the look of the scene sequencer's Nth keyframe instead of playing the sequence.
+// -sim and -look override fields of copies of the simulation settings and the display strategy
+// (e.g. -look "colorLow=0,0.2,0.3,1"), so a look can be tried without touching the project's assets. The player quits when done.
 [DefaultExecutionOrder(1000)]
 public class LiveCapture : MonoBehaviour
 {
@@ -27,7 +28,7 @@ public class LiveCapture : MonoBehaviour
     OrbitCamera orbitCamera;
 
     string outDir;
-    float seconds = 24, fps = 30, speed = 1, benchSeconds = 6;
+    float seconds = 24, fps = 30, speed = 1, benchSeconds = 6, rampSpeed, rampSeconds;
     bool fixedStep, orbit;
     Vector2Int size = new Vector2Int(1920, 1080);
     float yaw, yawSpeed, pitch, radius, fov;
@@ -36,7 +37,7 @@ public class LiveCapture : MonoBehaviour
     float startTime, nextCapture;
     int captured, frameLimit;
     int steps, warmupFrames;
-    readonly SortedDictionary<int, int> stepHistogram = new SortedDictionary<int, int>();
+    readonly List<Vector2Int> stepRuns = new List<Vector2Int>(); // (steps per frame, frames in a row)
     readonly List<float> frameTimes = new List<float>();
     readonly List<float> stamps = new List<float>();
     readonly List<Task> writes = new List<Task>();
@@ -82,6 +83,7 @@ public class LiveCapture : MonoBehaviour
         if (Arg("-speed") != null) speed = F(Arg("-speed"));
         if (Arg("-size") != null) { var s = Arg("-size").Split('x'); size = new Vector2Int(int.Parse(s[0]), int.Parse(s[1])); }
         fixedStep = Arg("-fixedStep") != null;
+        if (Arg("-ramp") != null) { var r = Arg("-ramp").Split(','); rampSpeed = F(r[0]); rampSeconds = F(r[1]); }
         if (Arg("-warmup") != null) warmupFrames = Mathf.RoundToInt(F(Arg("-warmup")) * fps); // fixed-step frames run before recording
         if (Arg("-orbit") != null)
         {
@@ -106,12 +108,12 @@ public class LiveCapture : MonoBehaviour
         if (fixedStep)
         {
             Time.captureFramerate = Mathf.RoundToInt(fps);
-            Time.timeScale = speed;
             // A whole number of equal simulation steps per frame, close to the project's step:
             // a frame that alternates between 2 and 3 steps visibly judders.
             int stepsPerFrame = Mathf.Max(1, Mathf.RoundToInt(speed / fps / Time.fixedDeltaTime));
             Time.fixedDeltaTime = speed / fps / stepsPerFrame;
-            Time.maximumDeltaTime = 2 * speed / fps; // never drop simulation steps, however coarse the capture
+            Time.maximumDeltaTime = 2 * Mathf.Max(speed, rampSpeed) / fps; // never drop simulation steps, however coarse the capture
+            Time.timeScale = TimeScale(0);
             Application.targetFrameRate = -1;
         }
         else Application.targetFrameRate = 60;
@@ -190,11 +192,26 @@ public class LiveCapture : MonoBehaviour
         }
         else
         {
-            if (captured > 0) stepHistogram[steps] = stepHistogram.TryGetValue(steps, out int c) ? c + 1 : 1;
+            if (captured > 0)
+            {
+                int last = stepRuns.Count - 1;
+                if (last >= 0 && stepRuns[last].x == steps) stepRuns[last] += Vector2Int.up;
+                else stepRuns.Add(new Vector2Int(steps, 1));
+            }
             steps = 0;
+            Time.timeScale = TimeScale(captured + 1 - warmupFrames); // for the next frame
             if (captured < warmupFrames) { captured++; return; }
         }
         Save(captured++ - warmupFrames);
+    }
+
+    // Time scale that runs a whole number of fixed steps in recorded frame `index`: -speed, or during
+    // the -ramp a speed eased from the ramp's start down to -speed.
+    float TimeScale(int index)
+    {
+        if (rampSeconds <= 0) return speed;
+        float s = Mathf.Lerp(rampSpeed, speed, Mathf.SmoothStep(0, 1, Mathf.Clamp01(index / (rampSeconds * fps))));
+        return Mathf.Max(1, Mathf.Round(s / fps / Time.fixedDeltaTime)) * Time.fixedDeltaTime * fps;
     }
 
     void Save(int index)
@@ -220,10 +237,9 @@ public class LiveCapture : MonoBehaviour
         string timing = Path.Combine(outDir, "timing.txt");
         if (fixedStep)
         {
-            var histogram = new List<string>();
-            foreach (var kv in stepHistogram) histogram.Add($"{kv.Key} steps x{kv.Value}");
+            var runs = stepRuns.ConvertAll(r => $"{r.x} steps x{r.y}");
             File.WriteAllText(timing, $"fixed step: {captured - warmupFrames} frames (after {warmupFrames} warmup) at {fps} fps, " +
-                $"speed {speed}x, {size.x}x{size.y}, sim step {Time.fixedDeltaTime * 1000:F2} ms; frames: {string.Join(", ", histogram)}\n");
+                $"speed {speed}x{(rampSeconds > 0 ? $" (ramped from {rampSpeed}x over {rampSeconds} s)" : "")}, {size.x}x{size.y}, sim step {Time.fixedDeltaTime * 1000:F2} ms; frames in order: {string.Join(", ", runs)}\n");
             UnityEngine.Debug.Log("[capture] " + File.ReadAllText(timing));
             Application.Quit();
             return;
