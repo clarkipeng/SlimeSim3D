@@ -2,7 +2,7 @@
 
 Read `~/.agentworld/lab/taste.md` first; this file refines it for this repo.
 
-- The thumbnail is the real-time cinematic look (Clark chose it over his original grey slime after seeing the long cut).
+- The thumbnail is the C5 cinematic clip's last frame (slime-poster.jpg), not the original grey slime: Clark picked C5 as both hover clip and thumbnail.
 - The site's three examples (grey density with dark veins, a violet line tangle, a teal line tangle) are the reference looks; clips and stills are judged against them side by side.
 - Hover clips start from nothing and let the slime grow: an empty volume at frame 0, the full sphere by the end.
 - Minimal camera motion: a locked camera, or at most one slow move. No zooms.
