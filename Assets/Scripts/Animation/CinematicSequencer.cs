@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
 using UnityEditor.Recorder;
 using UnityEditor.Recorder.Input;
 using UnityEditor.Recorder.Encoder;
+#endif
 
 public class CinematicSequencer : MonoBehaviour
 {
@@ -32,7 +34,9 @@ public class CinematicSequencer : MonoBehaviour
     private List<FieldInfo> colorFields = new List<FieldInfo>();
 
     private string sceneName;
+#if UNITY_EDITOR
     private RecorderController recorderController;
+#endif
     private DisplayStrategy activeSettings;
 
     void Start()

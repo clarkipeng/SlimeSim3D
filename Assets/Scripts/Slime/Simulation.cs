@@ -37,6 +37,8 @@ public class Simulation : MonoBehaviour
 
 	ComputeBuffer agentBuffer;
 
+	public RenderTexture DisplayTexture => displayTexture;
+
 	public RawImage outputImage;
 
 	// CAMERA INFO
