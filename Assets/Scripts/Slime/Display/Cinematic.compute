@@ -1,0 +1,287 @@
+// Real-time cinematic look: the Isosurface kernel's shading with soft volumetric shadows,
+// a glossy ground plane under a light pool, depth of field and an ACES tonemap.
+// The slime volume is the unit cube centred at the origin (texture coords = p + 0.5).
+#pragma kernel Occupancy
+#pragma kernel Trace
+#pragma kernel Composite
+
+Texture3D<float> TrailMap;
+SamplerState linearClampSampler;
+
+int resolution;
+int boundaryRadius;
+float4 slicePlane;
+
+float4x4 cameraToWorld;
+float4x4 cameraInverseProjection;
+
+// Isosurface shading (same parameters as IsosurfaceDisplayStrategy)
+float surfaceThreshold, shinyness, lightAmb;
+float3 lightDir; // towards the light, normalised
+float4 lightColor, frontColor, backColor;
+float keyIntensity;
+float lightSize;  // tangent of the key light's angular radius: sets shadow softness
+float selfShadow; // 0 = unshadowed project shading, 1 = full shadows
+
+// Occupancy mip chain for cone-traced soft shadows: level L averages 2^L voxels per side.
+Texture3D<float> OccMap;
+RWTexture3D<float> OccOut;
+int occLevel, occLevels;
+
+// Ground and background
+float groundY, groundGloss, poolRadius;
+float4 groundColor, bgColor;
+
+// Lens and grade
+float focusDist, cocScale, maxCoc; // coc in pixels = cocScale * |d - f| / d
+float exposure, vignette;
+
+uint width, height;
+RWTexture2D<float4> Scene; // rgb = linear radiance, a = distance from the camera
+Texture2D<float4> SceneIn;
+RWTexture2D<float4> Result;
+
+// Trails fade out over the last few voxels inside the boundary sphere, so strands that run into it
+// close into rounded ends instead of showing torn, open cuts.
+float Density(float3 p)
+{
+    float edge = (float)boundaryRadius / resolution - length(p - 0.5);
+    return TrailMap.SampleLevel(linearClampSampler, p, 0) * saturate(edge * resolution / 4);
+}
+
+// Cubic B-spline filtered density from 8 trilinear taps (Sigg & Hadwiger, GPU Gems 2 ch. 20).
+// Trilinear isosurfaces step between voxel layers, which shows as stripes up close; the cubic is
+// smooth, so the surface is refined and lit with it once the march has found a crossing.
+float DensitySmooth(float3 p)
+{
+    float3 x = p * resolution - 0.5, i = floor(x), f = x - i;
+    float3 w0 = (1 - f) * (1 - f) * (1 - f) / 6, w1 = (4 - 6 * f * f + 3 * f * f * f) / 6;
+    float3 w3 = f * f * f / 6, w2 = 1 - w0 - w1 - w3;
+    float3 g0 = w0 + w1, g1 = w2 + w3;
+    float3 h0 = (i - 0.5 + w1 / g0) / resolution, h1 = (i + 1.5 + w3 / g1) / resolution;
+    float d =
+        g0.z * (g0.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h0.y, h0.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h0.y, h0.z), 0))
+              + g1.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h1.y, h0.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h1.y, h0.z), 0)))
+      + g1.z * (g0.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h0.y, h1.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h0.y, h1.z), 0))
+              + g1.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h1.y, h1.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h1.y, h1.z), 0)));
+    float edge = (float)boundaryRadius / resolution - length(p - 0.5);
+    return d * saturate(edge * resolution / 4);
+}
+
+bool Bounds(float3 ro, float3 rd, out float tmin, out float tmax)
+{
+    tmin = 0; tmax = 0;
+    float radius = (float)boundaryRadius / resolution;
+    float b = dot(ro, rd);
+    float h = b * b - (dot(ro, ro) - radius * radius);
+    if (h < 0) return false;
+    h = sqrt(h);
+    float3 inv = 1.0 / rd;
+    float3 t0 = (-0.5 - ro) * inv, t1 = (0.5 - ro) * inv;
+    float3 lo = min(t0, t1), hi = max(t0, t1);
+    tmin = max(-b - h, max(max(lo.x, lo.y), lo.z));
+    tmax = min(-b + h, min(min(hi.x, hi.y), hi.z));
+    if (dot(slicePlane.xyz, slicePlane.xyz) > 0)
+    {
+        float denom = dot(rd, slicePlane.xyz);
+        float d0 = dot(ro, slicePlane.xyz) + slicePlane.w;
+        if (abs(denom) > 1e-6)
+        {
+            float tp = -d0 / denom;
+            if (denom < 0) tmin = max(tmin, tp); else tmax = min(tmax, tp);
+        }
+        else if (d0 > 0) return false;
+    }
+    tmin = max(tmin, 0);
+    return tmax > tmin;
+}
+
+// First crossing of the isosurface along the ray; p is the texture-space hit position.
+// Only a crossing from outside to inside counts: where a strand runs into the boundary sphere or
+// the slice plane, the cut would otherwise show as a smooth flat cap.
+bool HitVolume(float3 ro, float3 rd, out float tHit, out float3 p)
+{
+    tHit = 0; p = 0;
+    float tin, tout;
+    if (!Bounds(ro, rd, tin, tout)) return false;
+    float step = 0.5 / resolution;
+    float t = tin;
+    int emptyRun = 0; // a crossing counts after at least a voxel of empty space, not a grazing flicker
+    [loop] for (int i = 0; i < 2048 && t < tout; i++)
+    {
+        bool inside = Density(ro + rd * t + 0.5) > surfaceThreshold;
+        if (!inside) emptyRun++;
+        else if (emptyRun < 2) emptyRun = 0;
+        else
+        {
+            float a = t - step, b = t;
+            [unroll] for (int k = 0; k < 6; k++)
+            {
+                float m = 0.5 * (a + b);
+                if (DensitySmooth(ro + rd * m + 0.5) > surfaceThreshold) b = m; else a = m;
+            }
+            tHit = b;
+            p = ro + rd * tHit + 0.5;
+            return true;
+        }
+        t += step;
+    }
+    return false;
+}
+
+[numthreads(4, 4, 4)]
+void Occupancy(uint3 id : SV_DispatchThreadID)
+{
+    uint n = max(1u, (uint)resolution >> occLevel);
+    if (any(id >= n)) return;
+    int size = 1 << occLevel;
+    bool sliced = dot(slicePlane.xyz, slicePlane.xyz) > 0;
+    float sum = 0;
+    for (int z = 0; z < size; z++)
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                int3 v = id * size + int3(x, y, z);
+                // The half the slice plane cuts away casts no shadow either.
+                bool kept = !sliced || dot((v + 0.5) / resolution - 0.5, slicePlane.xyz) + slicePlane.w <= 0;
+                sum += kept && TrailMap.Load(int4(v, 0)) > surfaceThreshold ? 1 : 0;
+            }
+    OccOut[id] = sum / (size * size * size);
+}
+
+// Key light reaching x, cone traced through the occupancy mips: the cone widens with distance,
+// so occluders far from x cast wide penumbrae, as under an area light.
+float LightVisibility(float3 x)
+{
+    float tin, tout;
+    if (!Bounds(x, lightDir, tin, tout)) return 1;
+    float voxel = 1.0 / resolution;
+    float occ = 0;
+    float t = max(tin, 1.5 * voxel);
+    [loop] for (int i = 0; i < 256 && t < tout && occ < 0.99; i++)
+    {
+        float r = max(0.5 * voxel, t * lightSize);
+        float lod = clamp(log2(2 * r * resolution), 0, occLevels - 1);
+        // Occupancy is a volume fraction, but a strand blocks the light by its cross-section:
+        // a strand ~3 voxels thick across a cone 2r wide covers (2r / 3 voxels) times more.
+        float o = OccMap.SampleLevel(linearClampSampler, x + lightDir * t + 0.5, lod);
+        o = saturate(o * max(1, 2 * r * resolution / 3));
+        float step = max(r, 0.5 * voxel);
+        occ += (1 - occ) * (1 - pow(saturate(1 - o), step / (2 * r))); // opacity of a step through the cone
+        t += step;
+    }
+    return 1 - occ;
+}
+
+float3 Normal(float3 p)
+{
+    float e = 1.0 / resolution;
+    float3 n;
+    n.x = DensitySmooth(p - float3(e, 0, 0)) - DensitySmooth(p + float3(e, 0, 0));
+    n.y = DensitySmooth(p - float3(0, e, 0)) - DensitySmooth(p + float3(0, e, 0));
+    n.z = DensitySmooth(p - float3(0, 0, e)) - DensitySmooth(p + float3(0, 0, e));
+    return normalize(n + 1e-7);
+}
+
+float3 ShadeSlime(float3 p, float3 rd)
+{
+    float3 n = Normal(p);
+    float nl = dot(n, lightDir);
+    float diff = max(0, nl) * keyIntensity;
+    float spec = nl > 0 ? pow(max(0, dot(-rd, reflect(-lightDir, n))), shinyness) * keyIntensity : 0;
+    if (selfShadow > 0 && nl > 0)
+    {
+        float k = lerp(1, LightVisibility(p - 0.5 + n * (2.0 / resolution)), selfShadow);
+        diff *= k; spec *= k;
+    }
+    float3 obj = lerp(frontColor.rgb, backColor.rgb, saturate(length(p - 0.5) * 2));
+    return obj * (diff + lightAmb) + lightColor.rgb * spec;
+}
+
+float3 Background(float3 rd) { return bgColor.rgb * (0.6 + 0.4 * saturate(rd.y * 3 + 0.5)); }
+
+float4 Radiance(float3 ro, float3 rd)
+{
+    float tV; float3 pV;
+    bool hitV = HitVolume(ro, rd, tV, pV);
+    float tG = rd.y < 0 ? (groundY - ro.y) / rd.y : 1e9;
+    if (hitV && tV < tG) return float4(ShadeSlime(pV, rd), tV);
+    if (tG > 1e8) return float4(Background(rd), 1e4);
+
+    float3 x = ro + rd * tG;
+    float pool = exp(-dot(x.xz, x.xz) / (poolRadius * poolRadius));
+    float vis = pool > 1e-3 ? LightVisibility(x + float3(0, 1e-3, 0)) : 1;
+    float3 col = groundColor.rgb * (max(0, lightDir.y) * keyIntensity * vis * pool + lightAmb * 0.25 * (0.4 + 0.6 * pool));
+    // Glossy ground: reflect the slime with Schlick fresnel.
+    float3 rr = reflect(rd, float3(0, 1, 0));
+    float tR; float3 pR;
+    if (groundGloss > 0 && HitVolume(x, rr, tR, pR))
+        col += ShadeSlime(pR, rr) * (0.04 + 0.96 * pow(1 - saturate(-rd.y), 5)) * groundGloss;
+    float fog = exp(-max(0, length(x.xz) - 1.0) * 0.35);
+    return float4(lerp(Background(rd), col, fog), tG);
+}
+
+[numthreads(8, 8, 1)]
+void Trace(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= width || id.y >= height) return;
+    float2 uv = (id.xy + 0.5) / float2(width, height) * 2 - 1;
+    float3 ro = mul(cameraToWorld, float4(0, 0, 0, 1)).xyz;
+    float3 rd = mul(cameraInverseProjection, float4(uv, 0, 1)).xyz;
+    rd = normalize(mul(cameraToWorld, float4(rd, 0)).xyz);
+    float4 c = Radiance(ro, rd);
+    // Store depth along the view axis: a thin lens focuses on a plane.
+    Scene[id.xy] = float4(c.rgb, c.a * dot(rd, mul(cameraToWorld, float4(0, 0, -1, 0)).xyz));
+}
+
+float Coc(float d) { return min(maxCoc, cocScale * abs(d - focusDist) / max(d, 1e-3)); }
+
+float3 ACES(float3 x) { return saturate((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)); }
+
+// Depth-aware gather: a neighbour contributes when its own blur disc covers this pixel,
+// and a farther neighbour may not spread over a sharper surface in front of it.
+#define DOF_TAPS 96
+[numthreads(8, 8, 1)]
+void Composite(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= width || id.y >= height) return;
+    float4 centre = SceneIn[id.xy];
+    // One sample per pixel aliases silhouettes: where the four neighbours differ strongly in
+    // brightness or depth, resolve the pixel with a small tent filter instead.
+    {
+        int2 m = int2(width, height) - 1;
+        float4 l = SceneIn[clamp(int2(id.xy) + int2(-1, 0), 0, m)], r = SceneIn[clamp(int2(id.xy) + int2(1, 0), 0, m)];
+        float4 d = SceneIn[clamp(int2(id.xy) + int2(0, -1), 0, m)], u = SceneIn[clamp(int2(id.xy) + int2(0, 1), 0, m)];
+        float3 lum = float3(0.2126, 0.7152, 0.0722);
+        float lc = dot(centre.rgb, lum);
+        float contrast = max(max(abs(dot(l.rgb, lum) - lc), abs(dot(r.rgb, lum) - lc)), max(abs(dot(d.rgb, lum) - lc), abs(dot(u.rgb, lum) - lc)));
+        float depthJump = max(max(abs(l.a - centre.a), abs(r.a - centre.a)), max(abs(d.a - centre.a), abs(u.a - centre.a))) / max(centre.a, 1e-3);
+        float k = saturate(max((contrast / max(lc, 0.05) - 0.25) * 2, depthJump * 10 - 0.5));
+        centre.rgb = lerp(centre.rgb, 0.5 * centre.rgb + 0.125 * (l.rgb + r.rgb + d.rgb + u.rgb), k);
+    }
+    float cc = Coc(centre.a);
+    // Each tap stands for maxCoc^2/N of disc area; its energy is spread over its own disc.
+    float tapArea = maxCoc * maxCoc / DOF_TAPS;
+    float wsum = tapArea / max(cc * cc, 1);
+    float3 sum = centre.rgb * wsum;
+    if (maxCoc >= 1)
+    {
+        [loop] for (int i = 1; i < DOF_TAPS; i++)
+        {
+            float r = sqrt((i + 0.5) / DOF_TAPS) * maxCoc;
+            float a = i * 2.39996323;
+            int2 q = clamp(int2(id.xy) + int2(round(float2(cos(a), sin(a)) * r)), 0, int2(width, height) - 1);
+            float4 s = SceneIn[q];
+            float sc = Coc(s.a);
+            float spread = s.a > centre.a ? min(sc, cc) : sc;
+            float w = saturate(spread - r + 1) * tapArea / max(spread * spread, 1);
+            sum += s.rgb * w;
+            wsum += w;
+        }
+    }
+    float3 c = sum / wsum * exposure;
+    float2 uv = (id.xy + 0.5) / float2(width, height) * 2 - 1;
+    c *= 1 - vignette * dot(uv * float2(0.8, 1), uv * float2(0.8, 1)) * 0.5;
+    // Linear output: the project renders in linear colour space and encodes to sRGB on display.
+    Result[id.xy] = float4(ACES(c), 1);
+}
