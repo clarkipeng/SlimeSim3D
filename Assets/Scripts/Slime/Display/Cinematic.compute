@@ -104,11 +104,17 @@ void Occupancy(uint3 id : SV_DispatchThreadID)
     uint n = max(1u, (uint)resolution >> occLevel);
     if (any(id >= n)) return;
     int size = 1 << occLevel;
+    bool sliced = dot(slicePlane.xyz, slicePlane.xyz) > 0;
     float sum = 0;
     for (int z = 0; z < size; z++)
         for (int y = 0; y < size; y++)
             for (int x = 0; x < size; x++)
-                sum += TrailMap.Load(int4(id * size + int3(x, y, z), 0)) > surfaceThreshold ? 1 : 0;
+            {
+                int3 v = id * size + int3(x, y, z);
+                // The half the slice plane cuts away casts no shadow either.
+                bool kept = !sliced || dot((v + 0.5) / resolution - 0.5, slicePlane.xyz) + slicePlane.w <= 0;
+                sum += kept && TrailMap.Load(int4(v, 0)) > surfaceThreshold ? 1 : 0;
+            }
     OccOut[id] = sum / (size * size * size);
 }
 

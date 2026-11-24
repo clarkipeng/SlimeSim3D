@@ -11,11 +11,12 @@ using UnityEngine.SceneManagement;
 // Headless frame capture of a running scene, started only by command-line arguments:
 //   Slime.exe -batchmode -capture C:/out [-scene Name] [-seconds 24] [-fps 30] [-size 1920x1080]
 //             [-orbit yaw,yawPerSecond,pitch,radius,fov] [-seed 3] [-fixedStep] [-speed 1] [-keyframe N]
-//             [-sim field=value;...] [-look field=value;...]
+//             [-sim field=value;...] [-look field=value;...] [-warmup seconds]
 // Default is a live capture: the scene runs in real time and frames are read back at the capture
 // rate, stamped with wall-clock time, followed by a frame-time report and an uncapped benchmark.
 // With -fixedStep every frame advances exactly 1/fps of game time (times -speed) and is saved as
-// PNG, for masters whose timing must not depend on machine load. -keyframe shows the look of the
+// PNG, for masters whose timing must not depend on machine load; -warmup runs the sim that
+// long (in capture seconds) before the first saved frame. -keyframe shows the look of the
 // scene sequencer's Nth keyframe instead of playing the sequence. -sim and -look override fields of
 // copies of the simulation settings and the display strategy (e.g. -look "colorLow=0,0.2,0.3,1"),
 // so a look can be tried without touching the project's assets. The player quits when done.
@@ -34,6 +35,8 @@ public class LiveCapture : MonoBehaviour
     RenderTexture frame;
     float startTime, nextCapture;
     int captured, frameLimit;
+    int steps, warmupFrames;
+    readonly SortedDictionary<int, int> stepHistogram = new SortedDictionary<int, int>();
     readonly List<float> frameTimes = new List<float>();
     readonly List<float> stamps = new List<float>();
     readonly List<Task> writes = new List<Task>();
@@ -79,6 +82,7 @@ public class LiveCapture : MonoBehaviour
         if (Arg("-speed") != null) speed = F(Arg("-speed"));
         if (Arg("-size") != null) { var s = Arg("-size").Split('x'); size = new Vector2Int(int.Parse(s[0]), int.Parse(s[1])); }
         fixedStep = Arg("-fixedStep") != null;
+        if (Arg("-warmup") != null) warmupFrames = Mathf.RoundToInt(F(Arg("-warmup")) * fps); // fixed-step frames run before recording
         if (Arg("-orbit") != null)
         {
             var o = Arg("-orbit").Split(',');
@@ -103,6 +107,10 @@ public class LiveCapture : MonoBehaviour
         {
             Time.captureFramerate = Mathf.RoundToInt(fps);
             Time.timeScale = speed;
+            // A whole number of equal simulation steps per frame, close to the project's step:
+            // a frame that alternates between 2 and 3 steps visibly judders.
+            int stepsPerFrame = Mathf.Max(1, Mathf.RoundToInt(speed / fps / Time.fixedDeltaTime));
+            Time.fixedDeltaTime = speed / fps / stepsPerFrame;
             Time.maximumDeltaTime = 2 * speed / fps; // never drop simulation steps, however coarse the capture
             Application.targetFrameRate = -1;
         }
@@ -158,17 +166,19 @@ public class LiveCapture : MonoBehaviour
     void Update()
     {
         if (!orbit) return;
-        float t = fixedStep ? captured / fps : Time.realtimeSinceStartup - startTime;
+        float t = fixedStep ? Mathf.Max(0, captured - warmupFrames) / fps : Time.realtimeSinceStartup - startTime;
         orbitCamera.yaw = yaw + yawSpeed * t;
         orbitCamera.pitch = pitch;
         orbitCamera.radius = radius;
     }
 
+    void FixedUpdate() => steps++;
+
     void LateUpdate()
     {
         if (benchmarking) { Benchmark(); return; }
         float now = Time.realtimeSinceStartup;
-        if (fixedStep ? captured >= frameLimit : now - startTime > seconds) { Finish(); return; }
+        if (fixedStep ? captured >= warmupFrames + frameLimit : now - startTime > seconds) { Finish(); return; }
 
         if (!fixedStep)
         {
@@ -178,7 +188,13 @@ public class LiveCapture : MonoBehaviour
             if (nextCapture < now) nextCapture = now; // fell behind: keep wall-clock spacing honest
             stamps.Add(now - startTime);
         }
-        Save(captured++);
+        else
+        {
+            if (captured > 0) stepHistogram[steps] = stepHistogram.TryGetValue(steps, out int c) ? c + 1 : 1;
+            steps = 0;
+            if (captured < warmupFrames) { captured++; return; }
+        }
+        Save(captured++ - warmupFrames);
     }
 
     void Save(int index)
@@ -204,7 +220,10 @@ public class LiveCapture : MonoBehaviour
         string timing = Path.Combine(outDir, "timing.txt");
         if (fixedStep)
         {
-            File.WriteAllText(timing, $"fixed step: {captured} frames at {fps} fps, speed {speed}x, {size.x}x{size.y}\n");
+            var histogram = new List<string>();
+            foreach (var kv in stepHistogram) histogram.Add($"{kv.Key} steps x{kv.Value}");
+            File.WriteAllText(timing, $"fixed step: {captured - warmupFrames} frames (after {warmupFrames} warmup) at {fps} fps, " +
+                $"speed {speed}x, {size.x}x{size.y}, sim step {Time.fixedDeltaTime * 1000:F2} ms; frames: {string.Join(", ", histogram)}\n");
             UnityEngine.Debug.Log("[capture] " + File.ReadAllText(timing));
             Application.Quit();
             return;
