@@ -41,7 +41,32 @@ RWTexture2D<float4> Scene; // rgb = linear radiance, a = distance from the camer
 Texture2D<float4> SceneIn;
 RWTexture2D<float4> Result;
 
-float Density(float3 p) { return TrailMap.SampleLevel(linearClampSampler, p, 0); }
+// Trails fade out over the last few voxels inside the boundary sphere, so strands that run into it
+// close into rounded ends instead of showing torn, open cuts.
+float Density(float3 p)
+{
+    float edge = (float)boundaryRadius / resolution - length(p - 0.5);
+    return TrailMap.SampleLevel(linearClampSampler, p, 0) * saturate(edge * resolution / 4);
+}
+
+// Cubic B-spline filtered density from 8 trilinear taps (Sigg & Hadwiger, GPU Gems 2 ch. 20).
+// Trilinear isosurfaces step between voxel layers, which shows as stripes up close; the cubic is
+// smooth, so the surface is refined and lit with it once the march has found a crossing.
+float DensitySmooth(float3 p)
+{
+    float3 x = p * resolution - 0.5, i = floor(x), f = x - i;
+    float3 w0 = (1 - f) * (1 - f) * (1 - f) / 6, w1 = (4 - 6 * f * f + 3 * f * f * f) / 6;
+    float3 w3 = f * f * f / 6, w2 = 1 - w0 - w1 - w3;
+    float3 g0 = w0 + w1, g1 = w2 + w3;
+    float3 h0 = (i - 0.5 + w1 / g0) / resolution, h1 = (i + 1.5 + w3 / g1) / resolution;
+    float d =
+        g0.z * (g0.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h0.y, h0.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h0.y, h0.z), 0))
+              + g1.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h1.y, h0.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h1.y, h0.z), 0)))
+      + g1.z * (g0.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h0.y, h1.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h0.y, h1.z), 0))
+              + g1.y * (g0.x * TrailMap.SampleLevel(linearClampSampler, float3(h0.x, h1.y, h1.z), 0) + g1.x * TrailMap.SampleLevel(linearClampSampler, float3(h1.x, h1.y, h1.z), 0)));
+    float edge = (float)boundaryRadius / resolution - length(p - 0.5);
+    return d * saturate(edge * resolution / 4);
+}
 
 bool Bounds(float3 ro, float3 rd, out float tmin, out float tmax)
 {
@@ -90,10 +115,10 @@ bool HitVolume(float3 ro, float3 rd, out float tHit, out float3 p)
         else
         {
             float a = t - step, b = t;
-            [unroll] for (int k = 0; k < 5; k++)
+            [unroll] for (int k = 0; k < 6; k++)
             {
                 float m = 0.5 * (a + b);
-                if (Density(ro + rd * m + 0.5) > surfaceThreshold) b = m; else a = m;
+                if (DensitySmooth(ro + rd * m + 0.5) > surfaceThreshold) b = m; else a = m;
             }
             tHit = b;
             p = ro + rd * tHit + 0.5;
@@ -152,9 +177,9 @@ float3 Normal(float3 p)
 {
     float e = 1.0 / resolution;
     float3 n;
-    n.x = Density(p - float3(e, 0, 0)) - Density(p + float3(e, 0, 0));
-    n.y = Density(p - float3(0, e, 0)) - Density(p + float3(0, e, 0));
-    n.z = Density(p - float3(0, 0, e)) - Density(p + float3(0, 0, e));
+    n.x = DensitySmooth(p - float3(e, 0, 0)) - DensitySmooth(p + float3(e, 0, 0));
+    n.y = DensitySmooth(p - float3(0, e, 0)) - DensitySmooth(p + float3(0, e, 0));
+    n.z = DensitySmooth(p - float3(0, 0, e)) - DensitySmooth(p + float3(0, 0, e));
     return normalize(n + 1e-7);
 }
 
