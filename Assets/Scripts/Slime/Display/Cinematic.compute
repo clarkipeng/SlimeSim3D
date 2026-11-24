@@ -72,6 +72,8 @@ bool Bounds(float3 ro, float3 rd, out float tmin, out float tmax)
 }
 
 // First crossing of the isosurface along the ray; p is the texture-space hit position.
+// Only a crossing from outside to inside counts: where a strand runs into the boundary sphere or
+// the slice plane, the cut would otherwise show as a smooth flat cap.
 bool HitVolume(float3 ro, float3 rd, out float tHit, out float3 p)
 {
     tHit = 0; p = 0;
@@ -79,9 +81,13 @@ bool HitVolume(float3 ro, float3 rd, out float tHit, out float3 p)
     if (!Bounds(ro, rd, tin, tout)) return false;
     float step = 0.5 / resolution;
     float t = tin;
+    int emptyRun = 0; // a crossing counts after at least a voxel of empty space, not a grazing flicker
     [loop] for (int i = 0; i < 2048 && t < tout; i++)
     {
-        if (Density(ro + rd * t + 0.5) > surfaceThreshold)
+        bool inside = Density(ro + rd * t + 0.5) > surfaceThreshold;
+        if (!inside) emptyRun++;
+        else if (emptyRun < 2) emptyRun = 0;
+        else
         {
             float a = t - step, b = t;
             [unroll] for (int k = 0; k < 5; k++)
@@ -89,7 +95,7 @@ bool HitVolume(float3 ro, float3 rd, out float tHit, out float3 p)
                 float m = 0.5 * (a + b);
                 if (Density(ro + rd * m + 0.5) > surfaceThreshold) b = m; else a = m;
             }
-            tHit = max(b, tin);
+            tHit = b;
             p = ro + rd * tHit + 0.5;
             return true;
         }
@@ -131,7 +137,10 @@ float LightVisibility(float3 x)
     {
         float r = max(0.5 * voxel, t * lightSize);
         float lod = clamp(log2(2 * r * resolution), 0, occLevels - 1);
+        // Occupancy is a volume fraction, but a strand blocks the light by its cross-section:
+        // a strand ~3 voxels thick across a cone 2r wide covers (2r / 3 voxels) times more.
         float o = OccMap.SampleLevel(linearClampSampler, x + lightDir * t + 0.5, lod);
+        o = saturate(o * max(1, 2 * r * resolution / 3));
         float step = max(r, 0.5 * voxel);
         occ += (1 - occ) * (1 - pow(saturate(1 - o), step / (2 * r))); // opacity of a step through the cone
         t += step;
@@ -212,6 +221,19 @@ void Composite(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= width || id.y >= height) return;
     float4 centre = SceneIn[id.xy];
+    // One sample per pixel aliases silhouettes: where the four neighbours differ strongly in
+    // brightness or depth, resolve the pixel with a small tent filter instead.
+    {
+        int2 m = int2(width, height) - 1;
+        float4 l = SceneIn[clamp(int2(id.xy) + int2(-1, 0), 0, m)], r = SceneIn[clamp(int2(id.xy) + int2(1, 0), 0, m)];
+        float4 d = SceneIn[clamp(int2(id.xy) + int2(0, -1), 0, m)], u = SceneIn[clamp(int2(id.xy) + int2(0, 1), 0, m)];
+        float3 lum = float3(0.2126, 0.7152, 0.0722);
+        float lc = dot(centre.rgb, lum);
+        float contrast = max(max(abs(dot(l.rgb, lum) - lc), abs(dot(r.rgb, lum) - lc)), max(abs(dot(d.rgb, lum) - lc), abs(dot(u.rgb, lum) - lc)));
+        float depthJump = max(max(abs(l.a - centre.a), abs(r.a - centre.a)), max(abs(d.a - centre.a), abs(u.a - centre.a))) / max(centre.a, 1e-3);
+        float k = saturate(max((contrast / max(lc, 0.05) - 0.25) * 2, depthJump * 10 - 0.5));
+        centre.rgb = lerp(centre.rgb, 0.5 * centre.rgb + 0.125 * (l.rgb + r.rgb + d.rgb + u.rgb), k);
+    }
     float cc = Coc(centre.a);
     // Each tap stands for maxCoc^2/N of disc area; its energy is spread over its own disc.
     float tapArea = maxCoc * maxCoc / DOF_TAPS;
